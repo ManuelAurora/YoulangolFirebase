@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "cities": {
+      ".read": true,
+      ".write": true
+    },
+    "searchCity": {
+      ".read": true,
+      ".write": false
+    }
+  }
+}
