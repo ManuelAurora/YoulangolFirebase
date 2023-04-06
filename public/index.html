@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -43,15 +44,86 @@
     </ul>
     <button class="call">Say Hello</button>
   </section>
+  <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
+  <script src="https://www.gstatic.com/firebasejs/8.4.1/firebase-app.js"></script>
+  <script src="app.js"></script>
+  <script src="index.js"></script>
+  <!-- Add additional services that you want to use -->
+  <script src="https://www.gstatic.com/firebasejs/8.4.1/firebase-functions.js"></script>
   <script>
     const button = document.querySelector('.call');
 
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       console.log('Button clicked');
-      fetch('https://us-central1-youlangol.cloudfunctions.net/randomNumber', { method: 'POST' })
-              .then(response => response.text())
-              .then(data => console.log(data)); // output: "helllo, ninjas"
+
+      const generateRandomPrice = () => {
+        return Math.floor(Math.random() * 5001) + 5000;
+      };
+
+      const generateRandomTimestamp = () => {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const randomMonth = Math.floor(Math.random() * 12);
+        now.setMonth(randomMonth);
+        const timestamp = now.getTime();
+        now.setMonth(currentMonth);
+        return timestamp;
+      };
+      
+      const generateRandomString = () => {
+        const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+        let result = '';
+        for (let i = 0; i < 10; i++) {
+          result += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+        }
+        return result;
+      };
+
+      const cities = {
+        'Benguela': {latitude: -12.5763, longitude: 13.4055},
+        'Luanda': {latitude: -8.8399, longitude: 13.2894},
+        'Soyo': {latitude: -6.1349, longitude: 12.3689},
+        'Cabinda': {latitude: -5.5516, longitude: 12.1951},
+      };
+
+      const id = generateRandomString();
+      const price = generateRandomPrice();
+      const cityNames = Object.keys(cities);
+      const randomCity = cityNames[Math.floor(Math.random() * cityNames.length)];
+      const location = {
+        city: randomCity,
+        latitude: cities[randomCity].latitude,
+        longitude: cities[randomCity].longitude,
+        description: `Angola ${randomCity}`,
+        displayName: randomCity
+      };
+
+      const timestamp = generateRandomTimestamp();
+      const post = {
+        id,
+        image: 'https://www.meme-arsenal.com/memes/1f20c507a102ba45460319c2b92c1b69.jpg',
+        price,
+        title: 'Title',
+        categoryId: 'pron',
+        timestamp,
+        ownerId: 'abc',
+        description: 'Random description',
+        images: [
+          'https://www.meme-arsenal.com/memes/1f20c507a102ba45460319c2b92c1b69.jpg',
+          'https://www.meme-arsenal.com/memes/1f20c507a102ba45460319c2b92c1b69.jpg'
+        ],
+        location
+      };
+      console.log(post);
+      try {
+        const createPost = firebase.functions().httpsCallable('createPost');
+        const result = await createPost(post);
+        console.log('Post created:', result.data);
+      } catch (error) {
+        console.error('Error creating post:', error);
+      }
     });
+
   </script>
   
   <script type="module">
@@ -77,6 +149,7 @@
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
+    
   </script>
   </body>
 </html>

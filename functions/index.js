@@ -27,11 +27,36 @@ exports.getPosts = functions.https.onCall(async (data, context) => {
         query = query.where('location.city', '==', city);
     }
 
-    query = query.orderBy('createdAt', 'desc').startAt(startAfter).limit(pageSize);
+    query = query.orderBy('createdAt', 'desc');//.startAt(startAfter).limit(pageSize);
 
     const snapshot = await query.get();
     const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     return posts;
+});
+
+exports.getPosts2 = functions.https.onRequest(async (req, res) => {
+    const { page, category, city } = req.body;
+    const pageSize = 40;
+    const startAfter = (page - 1) * pageSize;
+    let query = admin.firestore().collection('posts');
+
+    if (category && city) {
+        query = query.where('categoryId', '==', category).where('location.city', '==', city);
+    } else if (category) {
+        query = query.where('categoryId', '==', category);
+    } else if (city) {
+        query = query.where('location.city', '==', city);
+    }
+
+    // query = query.orderBy('createdAt', 'desc').limit(pageSize);
+
+    try {
+        const snapshot = await query.get();
+        const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        res.status(200).json(posts);
+    } catch (error) {
+        res.status(500).send(error);
+    }
 });
 
 exports.postDetails = functions.https.onRequest(async (req, res) => {
@@ -192,4 +217,6 @@ exports.createPost = functions.https.onCall(async (data, context) => {
 
     return { id: newPostRef.id };
 });
+
+
 
