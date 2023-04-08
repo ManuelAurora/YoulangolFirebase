@@ -119,23 +119,6 @@ exports.getPostById = functions.https.onCall((data, context) => {
         });
 });
 
-exports.authenticateUser = functions.https.onCall((data, context) => {
-    const { email, password } = data;
-
-    return admin.auth().signInWithEmailAndPassword(email, password)
-        .then((userCredential) => {
-            // User authenticated successfully
-            const user = userCredential.user;
-            // Return user data
-            return { success: true, uid: user.uid, email: user.email };
-        })
-        .catch((error) => {
-            const errorCode = error.code;
-            const errorMessage = error.message;
-            return { error: errorMessage };
-        });
-});
-
 exports.registerUser = functions.https.onCall(async (data, context) => {
     const { email, password, name } = data;
 
@@ -148,27 +131,18 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
 
         await admin.auth().sendEmailVerification(userRecord.uid);
 
+        const userRef = admin.firestore().collection('users').doc(userRecord.uid);
+        await userRef.set({
+            email,
+            name,
+            rating: 0,
+            phone: '',
+        });
+
         return { success: true, message: 'User registered successfully. Please check your email to verify your account.' };
     } catch (error) {
         console.error(error);
-        return { success: false, message: 'Registration failed.' };
-    }
-});
-
-exports.verifyEmail = functions.https.onRequest(async (req, res) => {
-    const { mode, oobCode } = req.query;
-
-    try {
-        if (mode !== 'verifyEmail') {
-            throw new Error('Invalid verification request.');
-        }
-
-        await admin.auth().applyActionCode(oobCode);
-
-        res.send('Your email has been verified!');
-    } catch (error) {
-        console.error(error);
-        res.status(500).send('Email verification failed.');
+        return { success: false, error: error };
     }
 });
 
@@ -187,7 +161,7 @@ exports.signInWithFacebook = functions.https.onCall((data, context) => {
             const errorCode = error.code;
             const errorMessage = error.message;
             console.log(errorCode, errorMessage);
-            return { error: errorMessage };
+            return { success: false, error: error };
         });
 });
 
