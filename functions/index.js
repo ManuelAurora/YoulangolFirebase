@@ -1,7 +1,8 @@
 const functions = require("firebase-functions");
 const axios = require('axios');
-const { OAuth2Client } = require('google-auth-library');
 const admin = require('firebase-admin');
+
+import { getAuth, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 
 admin.initializeApp();
 
@@ -129,8 +130,11 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
             displayName: name
         });
 
-        await admin.auth().sendEmailVerification(userRecord.uid);
+        const auth = getAuth();
 
+        await createUserWithEmailAndPassword(auth, email, password);
+        await sendEmailVerification(auth.currentUser)
+        
         const userRef = admin.firestore().collection('users').doc(userRecord.uid);
         await userRef.set({
             email,
@@ -142,7 +146,7 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
         return { success: true, message: 'User registered successfully. Please check your email to verify your account.' };
     } catch (error) {
         console.error(error);
-        return { success: false, error: error };
+        throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
     }
 });
 
