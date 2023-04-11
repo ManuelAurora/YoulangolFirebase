@@ -2,17 +2,7 @@ const functions = require("firebase-functions");
 const axios = require('axios');
 const admin = require('firebase-admin');
 
-import { getAuth, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
-
 admin.initializeApp();
-
-// // Create and deploy your first functions
-// // https://firebase.google.com/docs/functions/get-started
-//
-// exports.helloWorld = functions.https.onRequest((request, response) => {
-//   functions.logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
 
 exports.getPosts = functions.https.onCall(async (data, context) => {
     const { page, category, city } = data;
@@ -129,11 +119,12 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
             password,
             displayName: name
         });
+        
 
-        const auth = getAuth();
-
-        await createUserWithEmailAndPassword(auth, email, password);
-        await sendEmailVerification(auth.currentUser)
+        // const auth = await admin.auth().generateEmailVerificationLink(email);
+    
+        // userRecord.em
+        // await sendEmailVerification(auth.currentUser)
         
         const userRef = admin.firestore().collection('users').doc(userRecord.uid);
         await userRef.set({
