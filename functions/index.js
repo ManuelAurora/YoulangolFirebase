@@ -1,16 +1,6 @@
 const functions = require("firebase-functions");
 const axios = require('axios');
 const admin = require('firebase-admin');
-const nodemailer = require('nodemailer');
-
-const adminEmail = 'ambo.angola@gmail.com';
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: adminEmail,
-        pass: 'huipizda'
-    }
-});
 
 admin.initializeApp();
 
@@ -121,34 +111,10 @@ exports.getPostById = functions.https.onCall((data, context) => {
 });
 
 exports.registerUser = functions.https.onCall(async (data, context) => {
-    const { email, password, name } = data;
+    const { uid, email, name } = data;
 
     try {
-        const userRecord = await admin.auth().createUser({
-            email,
-            password,
-            displayName: name
-        });
-
-        // Send email verification link to user
-        await admin.auth().generateEmailVerificationLink(email)
-            .then((link) => {
-                // Send the verification email to the user's email address
-                const mailOptions = {
-                    from: adminEmail,
-                    to: email,
-                    subject: 'Verify your email address',
-                    text: `Please click on the following link to verify your email address: ${link}`,
-                    html: `<p>Please click on the following link to verify your email address: <a href="${link}">${link}</a></p>`
-                };
-                return transporter.sendMail(mailOptions);
-            })
-            .catch((error) => {
-                console.error(error);
-                throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
-            });
-
-        const userRef = admin.firestore().collection('users').doc(userRecord.uid);
+        const userRef = admin.firestore().collection('users').doc(uid);
         await userRef.set({
             email,
             name,
