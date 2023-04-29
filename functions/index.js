@@ -164,22 +164,22 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
 });
 
 exports.signInWithFacebook = functions.https.onCall((data, context) => {
-    const { accessToken } = data;
-    const credential = admin.auth.FacebookAuthProvider.credential(accessToken);
-    return admin.auth().signInWithCredential(credential)
-        .then((result) => {
-            // Handle successful authentication
-            const user = result.user;
-            console.log(user);
-            return { message: 'Successfully signed in with Facebook!' };
-        })
-        .catch((error) => {
-            // Handle authentication errors
-            const errorCode = error.code;
-            const errorMessage = error.message;
-            console.log(errorCode, errorMessage);
-            return { success: false, error: error };
-        });
+    // const { accessToken } = data;
+    // const credential = admin.auth.FacebookAuthProvider.credential(accessToken);
+    // return admin.auth().signInWithCredential(credential)
+    //     .then((result) => {
+    //         // Handle successful authentication
+    //         const user = result.user;
+    //         console.log(user);
+    //         return { message: 'Successfully signed in with Facebook!' };
+    //     })
+    //     .catch((error) => {
+    //         // Handle authentication errors
+    //         const errorCode = error.code;
+    //         const errorMessage = error.message;
+    //         console.log(errorCode, errorMessage);
+    //         return { success: false, error: error };
+    //     });
 });
 
 exports.createPost = functions.https.onCall(async (data, context) => {
