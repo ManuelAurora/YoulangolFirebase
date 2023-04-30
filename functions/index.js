@@ -25,67 +25,6 @@ exports.getPosts = functions.https.onCall(async (data, context) => {
     return posts;
 });
 
-exports.getPosts2 = functions.https.onRequest(async (req, res) => {
-    const { page, category, city } = req.body;
-    const pageSize = 40;
-    const startAfter = (page - 1) * pageSize;
-    let query = admin.firestore().collection('posts');
-
-    if (category && city) {
-        query = query.where('categoryId', '==', category).where('location.city', '==', city);
-    } else if (category) {
-        query = query.where('categoryId', '==', category);
-    } else if (city) {
-        query = query.where('location.city', '==', city);
-    }
-
-    // query = query.orderBy('createdAt', 'desc').limit(pageSize);
-
-    try {
-        const snapshot = await query.get();
-        const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        res.status(200).json(posts);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
-
-exports.postDetails = functions.https.onRequest(async (req, res) => {
-    const id = req.query.id;
-    const doc = await db.collection('postDetails').doc(id).get();
-
-    if (!doc.exists) {
-        res.status(404).send('Post not found');
-    } else {
-        const postData = doc.data();
-        res.send(postData);
-    }
-});
-
-exports.searchCity = functions.https.onRequest(async (req, res) => {
-    const cityName = req.query.cityName;
-    const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${cityName}&format=json&limit=1`;
-
-    try {
-        const response = await axios.get(nominatimUrl);
-        const city = response.data[0];
-        if (city) {
-            const cityData = {
-                description: city.display_name,
-                latitude: parseFloat(city.lat),
-                longitude: parseFloat(city.lon),
-                city: city.osm_id
-            };
-            return res.status(200).send(cityData);
-        } else {
-            return res.status(404).send('City not found');
-        }
-    } catch (error) {
-        console.error(error);
-        return res.status(500).send('Server error');
-    }
-});
-
 exports.getUserById = functions.https.onCall((data, context) => {
     const userId = data.id;
     return admin.database().ref(`/users/${userId}`).once('value')
@@ -98,16 +37,20 @@ exports.getUserById = functions.https.onCall((data, context) => {
         });
 });
 
-exports.getPostById = functions.https.onCall((data, context) => {
+exports.getPostById = functions.https.onCall(async (data, context) => {
     const postId = data.id;
-    return admin.database().ref(`/posts/${postId}`).once('value')
-        .then(snapshot => {
-            const post = snapshot.val();
-            return post;
-        })
-        .catch(error => {
-            throw new functions.https.HttpsError('internal', error.message);
-        });
+
+    try {
+        const doc = await admin.firestore().collection('posts').doc(postId).get();
+        if (!doc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Post not found.');
+        }
+        const post = doc.data();
+        return post;
+    } catch (error) {
+        console.error(error);
+        throw new functions.https.HttpsError('internal', error.message);
+    }
 });
 
 exports.registerUser = functions.https.onCall(async (data, context) => {
