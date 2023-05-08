@@ -127,10 +127,16 @@ exports.createPost = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to create a post.');
     }
 
-    // data from client
-    const { title, description, price, categoryId, location, image } = data;
+    const { title, description, price, categoryId, location, images } = data;
 
     const userId = context.auth.uid;
+
+    const imageUrls = await Promise.all(images.map(async (imageData, i) => {
+        const fileName = `post_${newPostRef.id}_${i}`;
+        const file = admin.storage().bucket().file(fileName);
+        await file.save(imageData.buffer, { metadata: { contentType: imageData.mimeType } });
+        return file.publicUrl();
+    }));
 
     const newPost = {
         title,
@@ -138,7 +144,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
         price,
         categoryId,
         location,
-        image,
+        images: imageUrls,
         userId,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
@@ -147,6 +153,3 @@ exports.createPost = functions.https.onCall(async (data, context) => {
 
     return { id: newPostRef.id };
 });
-
-
-
