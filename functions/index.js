@@ -5,9 +5,10 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 
 exports.getPosts = functions.https.onCall(async (data, context) => {
-    const { page, category, city } = data;
+    const { page, category, location, radius } = data;
     const pageSize = 40;
     const startAfter = (page - 1) * pageSize;
+    const city = location.city;
     let query = admin.firestore().collection('posts');
 
     if (category && city) {
@@ -18,12 +19,41 @@ exports.getPosts = functions.https.onCall(async (data, context) => {
         query = query.where('location.city', '==', city);
     }
 
-    query = query.orderBy('createdAt', 'desc');//.startAt(startAfter).limit(pageSize);
+    query = query.orderBy('createdAt', 'desc');
 
-    const snapshot = await query.get();
-    const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    return posts;
+    let snapshot;
+    
+    try {
+        snapshot = await query.get();
+        const posts = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+
+        if (radius) {
+            const {latitude, longitude} = location;
+            const earthRadius = 6371;
+
+            const filteredPosts = posts.filter(post => {
+                const {lat: postLat, lon: postLng} = post.location;
+                const dLat = toRad(postLat - latitude);
+                const dLng = toRad(postLng - longitude);
+                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(toRad(latitude)) * Math.cos(toRad(postLat)) *
+                    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                const distance = earthRadius * c;
+                return distance <= radius;
+            });
+            return filteredPosts;
+        }
+    } catch (error) {
+        console.log(error);
+        return null;
+    }
 });
+
+function toRad(degrees) {
+    return degrees * Math.PI / 180;
+}
+
 
 exports.getUserById = functions.https.onCall((data, context) => {
     const userId = data.id;
