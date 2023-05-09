@@ -4,6 +4,8 @@ const admin = require('firebase-admin');
 
 admin.initializeApp();
 
+const earthRadius = 6371;
+
 exports.getPosts = functions.https.onCall(async (data, context) => {
     const { page, category, location, radius } = data;
     const pageSize = 40;
@@ -12,48 +14,46 @@ exports.getPosts = functions.https.onCall(async (data, context) => {
     let query = admin.firestore().collection('posts');
 
     if (category && city) {
-        query = query.where('categoryId', '==', category).where('location.city', '==', city);
+        query = query.where('categoryId', '==', category);
     } else if (category) {
         query = query.where('categoryId', '==', category);
-    } else if (city) {
-        query = query.where('location.city', '==', city);
     }
 
     query = query.orderBy('createdAt', 'desc');
 
     let snapshot;
-    
+
     try {
         snapshot = await query.get();
-        const posts = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+        const posts = await Promise.all(snapshot.docs.map(async (doc) => {
+            const postData = doc.data();
+            if (postData.locationRef) {
+                const locationId = postData.locationRef;
+                const locationSnap = await admin.firestore().collection('locations').doc(locationId).get();
+                const locationData = locationSnap.data();
+                postData.location = locationData;
+            }
+            return { id: doc.id, ...postData };
+        }));
 
-        if (radius) {
-            const {latitude, longitude} = location;
-            const earthRadius = 6371;
+        if (city) {
+            const filteredPosts = posts.filter(post => post.location.city == city);
 
-            const filteredPosts = posts.filter(post => {
-                const {lat: postLat, lon: postLng} = post.location;
-                const dLat = toRad(postLat - latitude);
-                const dLng = toRad(postLng - longitude);
-                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(toRad(latitude)) * Math.cos(toRad(postLat)) *
-                    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                const distance = earthRadius * c;
-                return distance <= radius;
-            });
-            return filteredPosts;
+            if (radius) {
+                return filterPostsByRadius(filteredPosts, location, radius)
+            } else {
+                return filteredPosts;
+            }
+        } else if (radius) {
+            return filterPostsByRadius(posts, location, radius)
+        } else {
+            return posts;
         }
     } catch (error) {
         console.log(error);
         return null;
     }
 });
-
-function toRad(degrees) {
-    return degrees * Math.PI / 180;
-}
-
 
 exports.getUserById = functions.https.onCall(async (data, context) => {
     const userId = data.id;
@@ -123,15 +123,17 @@ exports.signInWithFacebook = functions.https.onCall((data, context) => {
 });
 
 exports.createPost = functions.https.onCall(async (data, context) => {
-
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to create a post.');
     }
 
     const { title, description, price, categoryId, location, images } = data;
-
     const userId = context.auth.uid;
 
+    // Create a new location document in the 'locations' collection
+    const newLocationRef = await admin.firestore().collection('locations').add(location);
+
+    // Upload images to Cloud Storage
     const imageUrls = await Promise.all(images.map(async (imageData, i) => {
         const fileName = `post_${newPostRef.id}_${i}`;
         const file = admin.storage().bucket().file(fileName);
@@ -144,7 +146,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
         description,
         price,
         categoryId,
-        location,
+        locationRef: newLocationRef,
         images: imageUrls,
         userId,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
@@ -154,3 +156,32 @@ exports.createPost = functions.https.onCall(async (data, context) => {
 
     return { id: newPostRef.id };
 });
+
+
+/// Vsyakoe vspomogatelnoe govno
+
+async function filterPostsByRadius(posts, location, radius) {
+    const {latitude, longitude} = location;
+    const earthRadius = 6371;
+
+    const filteredPosts = await Promise.all(posts.map(async (post) => {
+        const { lat: postLat, lon: postLng } = post.location;
+        const dLat = toRad(postLat - latitude);
+        const dLng = toRad(postLng - longitude);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(latitude)) * Math.cos(toRad(postLat)) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = earthRadius * c;
+        if (distance <= radius) {
+            return post;
+        }
+    }));
+
+    return filteredPosts.filter(post => post);
+}
+
+function toRad(degrees) {
+    return degrees * Math.PI / 180;
+}
+
