@@ -157,6 +157,26 @@ exports.createPost = functions.https.onCall(async (data, context) => {
     return { id: newPostRef.id };
 });
 
+exports.getPostsByUser = functions.https.onCall(async (data, context) => {
+    const { userId } = data;
+
+    let query = admin.firestore().collection('posts').where('userId', '==', userId).orderBy('createdAt', 'desc');
+
+    let snapshot;
+
+    try {
+        snapshot = await query.get();
+        const posts = snapshot.docs.map((doc) => {
+            const postData = doc.data();
+            return { id: doc.id, ...postData };
+        });
+
+        return posts;
+    } catch (error) {
+        console.log(error);
+        return null;
+    }
+});
 
 /// Vsyakoe vspomogatelnoe govno
 
