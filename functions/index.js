@@ -55,17 +55,18 @@ function toRad(degrees) {
 }
 
 
-exports.getUserById = functions.https.onCall((data, context) => {
+exports.getUserById = functions.https.onCall(async (data, context) => {
     const userId = data.id;
-    return admin.database().ref(`/users/${userId}`).once('value')
-        .then(snapshot => {
-            const user = snapshot.val();
-            return user;
-        })
-        .catch(error => {
-            throw new functions.https.HttpsError('internal', error.message);
-        });
+    const userDoc = await admin.firestore().collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'User not found');
+    }
+    const user = userDoc.data();
+    
+    return user;
 });
+
 
 exports.getPostById = functions.https.onCall(async (data, context) => {
     const postId = data.id;
