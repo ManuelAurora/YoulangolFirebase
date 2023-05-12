@@ -95,21 +95,31 @@ exports.getPostById = functions.https.onCall(async (data, context) => {
 });
 
 exports.registerUser = functions.https.onCall(async (data, context) => {
-    const { uid, email, name } = data;
+    const { uid } = data;
 
     try {
         const userRef = admin.firestore().collection('users').doc(uid);
         await userRef.set({
-            email,
-            name,
             rating: 0,
-            phone: '',
         });
 
         return { success: true, message: 'User registered successfully. Please check your email to verify your account.' };
     } catch (error) {
         console.error(error);
         throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+    }
+});
+
+exports.editProfile = functions.https.onCall(async (data, context) => {
+    const userId = context.auth.uid;
+    const { displayName, photoURL } = data;
+
+    try {
+        await admin.auth().updateUser(userId, { displayName, photoURL });
+        return { message: "Profile updated successfully" };
+    } catch (error) {
+        console.error(error);
+        throw new functions.https.HttpsError("internal", "An error occurred while updating the profile.");
     }
 });
 
