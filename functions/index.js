@@ -167,6 +167,63 @@ exports.createPost = functions.https.onCall(async (data, context) => {
     return { id: newPostRef.id };
 });
 
+exports.editPost = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to edit a post.');
+    }
+
+    const { postId, title, description, price, categoryId, location, images } = data;
+    const userId = context.auth.uid;
+
+    const postRef = admin.firestore().collection('posts').doc(postId);
+    const postDoc = await postRef.get();
+
+    if (!postDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Post not found');
+    }
+
+    const post = postDoc.data();
+
+    if (post.userId !== userId) {
+        throw new functions.https.HttpsError('permission-denied', 'You do not have permission to edit this post');
+    }
+    
+    // upd location
+    let locationRef = post.locationRef;
+    if (location) {
+        const locationDoc = await admin.firestore().collection('locations').doc(post.locationRef.id).get();
+        await locationDoc.ref.update(location);
+        locationRef = locationDoc.ref;
+    }
+
+    // upd images
+    let imageUrls = post.images;
+    if (images) {
+        const newImageUrls = await Promise.all(images.map(async (imageData, i) => {
+            const fileName = `post_${postId}_${i}`;
+            const file = admin.storage().bucket().file(fileName);
+            await file.save(imageData.buffer, { metadata: { contentType: imageData.mimeType } });
+            return file.publicUrl();
+        }));
+        imageUrls = newImageUrls;
+    }
+    
+    // upd post
+    const postData = {
+        title: title || post.title,
+        description: description || post.description,
+        price: price || post.price,
+        categoryId: categoryId || post.categoryId,
+        locationRef,
+        images: imageUrls,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    await postRef.update(postData);
+
+    return { id: postId };
+});
+
 exports.getPostsByUser = functions.https.onCall(async (data, context) => {
     const { userId } = data;
 
