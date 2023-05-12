@@ -56,13 +56,23 @@ exports.getPosts = functions.https.onCall(async (data, context) => {
 });
 
 exports.getUserById = functions.https.onCall(async (data, context) => {
-    const userId = data.id;
+    const userId = data.userId;
     const userDoc = await admin.firestore().collection('users').doc(userId).get();
     
     if (!userDoc.exists) {
         throw new functions.https.HttpsError('not-found', 'User not found');
     }
     const user = userDoc.data();
+    const userRecord = await admin.auth().getUser(userId);
+    const creationTime = userRecord.metadata.creationTime;
+    
+    user.dateCreated = creationTime;
+    user.emailVerified = userRecord.emailVerified;
+    user.name = userRecord.displayName;
+    user.email = userRecord.email;
+    user.phone = userRecord.phoneNumber;
+    user.photoURL = userRecord.photoURL;
+    user.disabled = userRecord.disabled;
     
     return user;
 });
