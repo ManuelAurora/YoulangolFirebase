@@ -255,6 +255,76 @@ exports.getPostsByUser = functions.https.onCall(async (data, context) => {
     }
 });
 
+exports.createChat = functions.https.onCall(async (data, context) => {
+    const { senderId, receiverId, postId } = data;
+
+    if (!senderId || !receiverId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Sender and receiver IDs are required.');
+    }
+
+    if (senderId === receiverId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Sender and receiver IDs cannot be the same.');
+    }
+
+    const newChatRef = admin.firestore().collection('chats').doc();
+    const chatId = newChatRef.id;
+
+    const newChat = {
+        chatId,
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    };
+
+    await admin.firestore().collection('chats').doc(chatId).set(newChat);
+
+    await Promise.all([
+        admin.firestore().collection('users').doc(senderId).update({
+            activeChats: admin.firestore.FieldValue.arrayUnion(chatId)
+        }),
+        admin.firestore().collection('users').doc(receiverId).update({
+            activeChats: admin.firestore.FieldValue.arrayUnion(chatId)
+        })
+    ]);
+
+    return { success: true, message: 'success', chatId };
+});
+
+exports.sendMessage = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to send a message.');
+    }
+
+    const { text, chatId } = data;
+    const senderId = context.auth.uid;
+    const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+    const chatRef = admin.firestore().doc(`chats/${chatId}`);
+
+    try {
+        await chatRef.update({
+            messages: admin.firestore.FieldValue.arrayUnion({ senderId, text, timestamp }),
+            updatedAt: timestamp
+        });
+
+        // notification
+        // const payload = {
+        //     notification: {
+        //         title: 'New message',
+        //         body: `You have a new message from ${senderId}`,
+        //         icon: '/assets/icons/icon-96x96.png',
+        //         clickAction: `https://${process.env.GCLOUD_PROJECT}.firebaseapp.com/chat/${chatId}`
+        //     }
+        // };
+        // await admin.messaging().sendToTopic(chatRef.path, payload);
+
+        return { success: true };
+    } catch (error) {
+        console.error(error);
+        throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+    }
+});
+
 /// Vsyakoe vspomogatelnoe govno
 
 async function filterPostsByRadius(posts, location, radius) {
