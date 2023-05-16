@@ -271,9 +271,11 @@ exports.createChat = functions.https.onCall(async (data, context) => {
 
     const newChat = {
         chatId,
+        postId,
         messages: [],
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        participants: [senderId, receiverId]
     };
 
     await admin.firestore().collection('chats').doc(chatId).set(newChat);
@@ -289,6 +291,90 @@ exports.createChat = functions.https.onCall(async (data, context) => {
 
     return { success: true, message: 'success', chatId };
 });
+
+exports.getChats = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve chats.');
+    }
+
+    const userId = context.auth.uid;
+
+    try {
+        const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+        if (!userDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'User not found.');
+        }
+
+        const userData = userDoc.data();
+        const activeChats = userData.activeChats || [];
+
+        const querySnapshot = await admin.firestore().collection('chats')
+            .where(admin.firestore.FieldPath.documentId(), 'in', activeChats)
+            .get();
+
+        const chats = [];
+
+        const chatPromises = querySnapshot.docs.map(async (doc) => {
+            const chatData = doc.data();
+            const chatId = doc.id;
+            const messages = chatData.messages || [];
+            const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+            const isOurs = lastMessage ? lastMessage.senderId === userId : false;
+            const totalMessages = messages.filter((message) => !message.isRead && message.senderId !== userId).length;
+            const postId = chatData.postId || '';
+            const participantId = Object.keys(chatData.participants).find((id) => id !== userId);
+
+            let postFoto = '';
+
+            if (postId) {
+                const postDoc = await admin.firestore().collection('posts').doc(postId).get();
+
+                if (postDoc.exists) {
+                    const postData = postDoc.data();
+                    const images = postData.images || [];
+
+                    if (images.length > 0) {
+                        postFoto = images[0];
+                    }
+                }
+            }
+
+            const participantUser = await admin.auth().getUser(participantId);
+            const participantName = participantUser.displayName || '';
+            const participantPhoto = participantUser.photoURL || '';
+
+            // Construct the chat object with the desired information
+            const chat = {
+                chatId,
+                lastMessage,
+                isOurs,
+                totalMessages,
+                postFoto,
+                participantId,
+                participantName,
+                participantPhoto
+            };
+
+            return chat;
+        });
+
+        const chatResults = await Promise.all(chatPromises);
+        chats.push(...chatResults);
+
+        return chats;
+    } catch (error) {
+        console.error(error);
+        throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+    }
+});
+
+// 0. Список чатов по id юзера (id чата, последнее сообщение, пропертю на сообщение bool, количество непрочитанных. фотка товара, фотка отправителя, айди отправителя, имя)
+// 1. Добавить запрос чата по id (можно обнулять непрочитанные сообщения), инфу о юзере и товаре
+
+// пост
+// Добавить юзерАйди в запрос getUserById
+// Добавить инфу о юзере в пост, по аналогии с getUserById
 
 exports.sendMessage = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
