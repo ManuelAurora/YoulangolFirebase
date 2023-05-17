@@ -296,7 +296,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve chats.');
     }
-
+    
     const userId = context.auth.uid;
 
     try {
@@ -323,7 +323,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const isOurs = lastMessage ? lastMessage.senderId === userId : false;
             const totalMessages = messages.filter((message) => !message.isRead && message.senderId !== userId).length;
             const postId = chatData.postId || '';
-            const participantId = Object.keys(chatData.participants).find((id) => id !== userId);
+            const participantId = chatData.participants.find((id) => id !== userId);
 
             let postFoto = '';
 
@@ -344,7 +344,6 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const participantName = participantUser.displayName || '';
             const participantPhoto = participantUser.photoURL || '';
 
-            // Construct the chat object with the desired information
             const chat = {
                 chatId,
                 lastMessage,
@@ -368,6 +367,77 @@ exports.getChats = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
     }
 });
+
+exports.getChatById = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve a chat.');
+    }
+
+    const { chatId } = data;
+    const userId = context.auth.uid;
+
+    try {
+        const chatDoc = await admin.firestore().collection('chats').doc(chatId).get();
+
+        if (!chatDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Chat not found.');
+        }
+
+        const chatData = chatDoc.data();
+        const postId = chatData.postId || '';
+        const participantId = chatData.participants.find((id) => id !== userId);
+
+        let postFoto = '';
+        let postTitle = '';
+        let participantName = '';
+        let participantPhoto = '';
+
+        if (postId) {
+            const postDoc = await admin.firestore().collection('posts').doc(postId).get();
+
+            if (postDoc.exists) {
+                const postData = postDoc.data();
+                const images = postData.images || [];
+
+                if (images.length > 0) {
+                    postFoto = images[0];
+                }
+
+                postTitle = postData.title || '';
+            }
+        }
+
+        const [userSnapshot, participantSnapshot] = await Promise.all([
+            admin.auth().getUser(userId),
+            admin.auth().getUser(participantId),
+        ]);
+
+        participantName = participantSnapshot.displayName || '';
+        participantPhoto = participantSnapshot.photoURL || '';
+
+        const chat = {
+            chatData,
+            postFoto,
+            postTitle,
+            participant: {
+                id: participantId,
+                name: participantName,
+                photoUrl: participantPhoto,
+            },
+            currentUser: {
+                id: userId,
+                name: userSnapshot.displayName || '',
+                photoUrl: userSnapshot.photoURL || '',
+            }
+        };
+
+        return chat;
+    } catch (error) {
+        console.error(error);
+        throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+    }
+});
+
 
 // 0. Список чатов по id юзера (id чата, последнее сообщение, пропертю на сообщение bool, количество непрочитанных. фотка товара, фотка отправителя, айди отправителя, имя)
 // 1. Добавить запрос чата по id (можно обнулять непрочитанные сообщения), инфу о юзере и товаре
