@@ -73,6 +73,7 @@ exports.getUserById = functions.https.onCall(async (data, context) => {
     user.phone = userRecord.phoneNumber;
     user.photoURL = userRecord.photoURL;
     user.disabled = userRecord.disabled;
+    user.id = userId;
     
     return user;
 });
@@ -86,7 +87,25 @@ exports.getPostById = functions.https.onCall(async (data, context) => {
         if (!doc.exists) {
             throw new functions.https.HttpsError('not-found', 'Post not found.');
         }
-        const post = doc.data();
+
+        const data = doc.data();
+        const userRecord = await admin.auth().getUser(data.userId);
+        const creationTime = userRecord.metadata.creationTime;
+        
+        const post = {
+            data: data,
+            user: {
+                creationTime: creationTime,
+                emailVerified: userRecord.emailVerified,
+                name: userRecord.displayName,
+                email: userRecord.email,
+                phone: userRecord.phoneNumber,
+                photoURL: userRecord.photoURL,
+                disabled: userRecord.disabled,
+                id: data.userId
+            }
+        };
+        
         return post;
     } catch (error) {
         console.error(error);
