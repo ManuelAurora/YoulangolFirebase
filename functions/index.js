@@ -1,13 +1,185 @@
-const functions = require("firebase-functions");
-const axios = require('axios');
+const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
 
-const earthRadius = 6371;
+// User
+exports.registerUser = functions.https.onCall(async (data) => {
+    const { uid } = data;
 
-exports.getPosts = functions.https.onCall(async (data, context) => {
-    const { page, category, location, radius } = data;
+    try {
+        const userRef = admin.firestore().collection('users')
+            .doc(uid);
+
+        await userRef.set({ rating: 0 });
+
+        return {
+            success: true,
+            message: 'User registered successfully. Please check your email to verify your account.',
+        };
+    } catch (error) {
+        console.error(error);
+        throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+    }
+});
+
+exports.getUserById = functions.https.onCall(async (data) => {
+    const userId = data.userId;
+    const userDoc = await admin.firestore().collection('users')
+        .doc(userId)
+        .get();
+
+    if (!userDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'User not found');
+    }
+
+    const user = userDoc.data();
+    const userRecord = await admin.auth().getUser(userId);
+
+    user.dateCreated = userRecord.metadata.creationTime;
+    user.emailVerified = userRecord.emailVerified;
+    user.name = userRecord.displayName;
+    user.email = userRecord.email;
+    user.phone = userRecord.phoneNumber;
+    user.photoURL = userRecord.photoURL;
+    user.disabled = userRecord.disabled;
+    user.id = userId;
+
+    return user;
+});
+
+// это есть на фронте и здесь можно удалить, если мы меняем только имя и фото
+// https://firebase.google.com/docs/auth/web/manage-users#update_a_users_profile
+exports.editProfile = functions.https.onCall(async (data, context) => {
+    const userId = context.auth.uid;
+    const { displayName, photoURL } = data;
+
+    try {
+        await admin.auth().updateUser(userId, { displayName, photoURL });
+
+        return { message: 'Profile updated successfully' };
+    } catch (error) {
+        console.error(error);
+        throw new functions.https.HttpsError('internal', 'An error occurred while updating the profile.');
+    }
+});
+
+
+// Posts
+exports.createPost = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to create a post.');
+    }
+
+    const { title, description, price, categoryId, location, images } = data;
+
+    const userId = context.auth.uid;
+
+    // Create a new location document in the 'locations' collection
+    const newLocationRef = await admin.firestore().collection('locations')
+        .add(location);
+
+    // Upload images to Cloud Storage
+    const imageUrls = await Promise.all(
+        images.map(async (imageData, i) => {
+            const fileName = `post_${newPostRef.id}_${i}`;
+
+            const file = admin.storage().bucket()
+                .file(fileName);
+
+            await file.save(imageData.buffer, { metadata: { contentType: imageData.mimeType } });
+
+            return file.publicUrl();
+        }),
+    );
+
+    const newPost = {
+        title,
+        description,
+        price,
+        categoryId,
+        locationRef: newLocationRef,
+        images: imageUrls,
+        userId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const newPostRef = await admin.firestore().collection('posts')
+        .add(newPost);
+
+    return { id: newPostRef.id };
+});
+
+exports.editPost = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to edit a post.');
+    }
+
+    const { postId, title, description, price, categoryId, location, images } = data;
+    const userId = context.auth.uid;
+
+    const postRef = admin.firestore().collection('posts')
+        .doc(postId);
+    const postDoc = await postRef.get();
+
+    if (!postDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Post not found');
+    }
+
+    const post = postDoc.data();
+
+    if (post.userId !== userId) {
+        throw new functions.https.HttpsError('permission-denied', 'You do not have permission to edit this post');
+    }
+
+    // upd location
+    let locationRef = post.locationRef;
+
+    if (location) {
+        const locationDoc = await admin.firestore().collection('locations')
+            .doc(post.locationRef.id)
+            .get();
+
+        await locationDoc.ref.update(location);
+
+        locationRef = locationDoc.ref;
+    }
+
+    // upd images
+    let imageUrls = post.images;
+
+    if (images) {
+        imageUrls = await Promise.all(
+            images.map(async (imageData, i) => {
+                const fileName = `post_${postId}_${i}`;
+                const file = admin.storage().bucket()
+                    .file(fileName);
+
+                await file.save(imageData.buffer, { metadata: { contentType: imageData.mimeType } });
+
+                return file.publicUrl();
+            }),
+        );
+    }
+
+    // upd post
+    const postData = {
+        title: title || post.title,
+        description: description || post.description,
+        price: price || post.price,
+        categoryId: categoryId || post.categoryId,
+        locationRef,
+        images: imageUrls,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await postRef.update(postData);
+
+    return { id: postId };
+});
+
+exports.getPosts = functions.https.onCall(async (data) => {
+    const { page = 1, category, location, radius } = data;
     const pageSize = 40;
     const startAfter = (page - 1) * pageSize;
     const city = location.city;
@@ -25,65 +197,53 @@ exports.getPosts = functions.https.onCall(async (data, context) => {
 
     try {
         snapshot = await query.get();
-        const posts = await Promise.all(snapshot.docs.map(async (doc) => {
-            const postData = doc.data();
-            if (postData.locationRef) {
-                const locationId = postData.locationRef;
-                const locationSnap = await admin.firestore().collection('locations').doc(locationId).get();
-                const locationData = locationSnap.data();
-                postData.location = locationData;
-            }
-            return { id: doc.id, ...postData };
-        }));
+        const posts = await Promise.all(
+            snapshot.docs.map(async (doc) => {
+                const postData = doc.data();
+
+                if (postData.locationRef) {
+                    const locationId = postData.locationRef;
+                    const locationSnap = await admin.firestore().collection('locations')
+                        .doc(locationId)
+                        .get();
+
+                    postData.location = locationSnap.data();
+                }
+
+                return { id: doc.id, ...postData };
+            }),
+        );
 
         if (city) {
-            const filteredPosts = posts.filter(post => post.location.city == city);
+            const filteredPosts = posts.filter(post => post.location && (post.location.city === city));
 
             if (radius) {
-                return filterPostsByRadius(filteredPosts, location, radius)
-            } else {
-                return filteredPosts;
+                return filterPostsByRadius(filteredPosts, location, radius);
             }
-        } else if (radius) {
-            return filterPostsByRadius(posts, location, radius)
-        } else {
-            return posts;
+
+            return filteredPosts;
         }
+
+        if (radius) {
+            return filterPostsByRadius(posts, location, radius);
+        }
+
+        return posts;
     } catch (error) {
         console.log(error);
+
         return null;
     }
 });
 
-exports.getUserById = functions.https.onCall(async (data, context) => {
-    const userId = data.userId;
-    const userDoc = await admin.firestore().collection('users').doc(userId).get();
-    
-    if (!userDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'User not found');
-    }
-    const user = userDoc.data();
-    const userRecord = await admin.auth().getUser(userId);
-    const creationTime = userRecord.metadata.creationTime;
-    
-    user.dateCreated = creationTime;
-    user.emailVerified = userRecord.emailVerified;
-    user.name = userRecord.displayName;
-    user.email = userRecord.email;
-    user.phone = userRecord.phoneNumber;
-    user.photoURL = userRecord.photoURL;
-    user.disabled = userRecord.disabled;
-    user.id = userId;
-    
-    return user;
-});
-
-
-exports.getPostById = functions.https.onCall(async (data, context) => {
+exports.getPostById = functions.https.onCall(async (data) => {
     const postId = data.id;
 
     try {
-        const doc = await admin.firestore().collection('posts').doc(postId).get();
+        const doc = await admin.firestore().collection('posts')
+            .doc(postId)
+            .get();
+
         if (!doc.exists) {
             throw new functions.https.HttpsError('not-found', 'Post not found.');
         }
@@ -91,190 +251,53 @@ exports.getPostById = functions.https.onCall(async (data, context) => {
         const data = doc.data();
         const userRecord = await admin.auth().getUser(data.userId);
         const creationTime = userRecord.metadata.creationTime;
-        
-        const post = {
-            data: data,
+
+        return {
+            data,
             user: {
-                creationTime: creationTime,
+                creationTime,
                 emailVerified: userRecord.emailVerified,
                 name: userRecord.displayName,
                 email: userRecord.email,
                 phone: userRecord.phoneNumber,
                 photoURL: userRecord.photoURL,
                 disabled: userRecord.disabled,
-                id: data.userId
-            }
+                id: data.userId,
+            },
         };
-        
-        return post;
     } catch (error) {
         console.error(error);
         throw new functions.https.HttpsError('internal', error.message);
     }
 });
 
-exports.registerUser = functions.https.onCall(async (data, context) => {
-    const { uid } = data;
-
-    try {
-        const userRef = admin.firestore().collection('users').doc(uid);
-        await userRef.set({
-            rating: 0,
-        });
-
-        return { success: true, message: 'User registered successfully. Please check your email to verify your account.' };
-    } catch (error) {
-        console.error(error);
-        throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
-    }
-});
-
-exports.editProfile = functions.https.onCall(async (data, context) => {
-    const userId = context.auth.uid;
-    const { displayName, photoURL } = data;
-
-    try {
-        await admin.auth().updateUser(userId, { displayName, photoURL });
-        return { message: "Profile updated successfully" };
-    } catch (error) {
-        console.error(error);
-        throw new functions.https.HttpsError("internal", "An error occurred while updating the profile.");
-    }
-});
-
-exports.signInWithFacebook = functions.https.onCall((data, context) => {
-    // const { accessToken } = data;
-    // const credential = admin.auth.FacebookAuthProvider.credential(accessToken);
-    // return admin.auth().signInWithCredential(credential)
-    //     .then((result) => {
-    //         // Handle successful authentication
-    //         const user = result.user;
-    //         console.log(user);
-    //         return { message: 'Successfully signed in with Facebook!' };
-    //     })
-    //     .catch((error) => {
-    //         // Handle authentication errors
-    //         const errorCode = error.code;
-    //         const errorMessage = error.message;
-    //         console.log(errorCode, errorMessage);
-    //         return { success: false, error: error };
-    //     });
-});
-
-exports.createPost = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to create a post.');
-    }
-
-    const { title, description, price, categoryId, location, images } = data;
-    const userId = context.auth.uid;
-
-    // Create a new location document in the 'locations' collection
-    const newLocationRef = await admin.firestore().collection('locations').add(location);
-
-    // Upload images to Cloud Storage
-    const imageUrls = await Promise.all(images.map(async (imageData, i) => {
-        const fileName = `post_${newPostRef.id}_${i}`;
-        const file = admin.storage().bucket().file(fileName);
-        await file.save(imageData.buffer, { metadata: { contentType: imageData.mimeType } });
-        return file.publicUrl();
-    }));
-
-    const newPost = {
-        title,
-        description,
-        price,
-        categoryId,
-        locationRef: newLocationRef,
-        images: imageUrls,
-        userId,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-    const newPostRef = await admin.firestore().collection('posts').add(newPost);
-
-    return { id: newPostRef.id };
-});
-
-exports.editPost = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to edit a post.');
-    }
-
-    const { postId, title, description, price, categoryId, location, images } = data;
-    const userId = context.auth.uid;
-
-    const postRef = admin.firestore().collection('posts').doc(postId);
-    const postDoc = await postRef.get();
-
-    if (!postDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'Post not found');
-    }
-
-    const post = postDoc.data();
-
-    if (post.userId !== userId) {
-        throw new functions.https.HttpsError('permission-denied', 'You do not have permission to edit this post');
-    }
-    
-    // upd location
-    let locationRef = post.locationRef;
-    if (location) {
-        const locationDoc = await admin.firestore().collection('locations').doc(post.locationRef.id).get();
-        await locationDoc.ref.update(location);
-        locationRef = locationDoc.ref;
-    }
-
-    // upd images
-    let imageUrls = post.images;
-    if (images) {
-        const newImageUrls = await Promise.all(images.map(async (imageData, i) => {
-            const fileName = `post_${postId}_${i}`;
-            const file = admin.storage().bucket().file(fileName);
-            await file.save(imageData.buffer, { metadata: { contentType: imageData.mimeType } });
-            return file.publicUrl();
-        }));
-        imageUrls = newImageUrls;
-    }
-    
-    // upd post
-    const postData = {
-        title: title || post.title,
-        description: description || post.description,
-        price: price || post.price,
-        categoryId: categoryId || post.categoryId,
-        locationRef,
-        images: imageUrls,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-    await postRef.update(postData);
-
-    return { id: postId };
-});
-
-exports.getPostsByUser = functions.https.onCall(async (data, context) => {
+exports.getPostsByUser = functions.https.onCall(async (data) => {
     const { userId } = data;
 
-    let query = admin.firestore().collection('posts').where('userId', '==', userId).orderBy('createdAt', 'desc');
+    const query = admin.firestore().collection('posts')
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc');
 
     let snapshot;
 
     try {
         snapshot = await query.get();
-        const posts = snapshot.docs.map((doc) => {
+
+        return snapshot.docs.map((doc) => {
             const postData = doc.data();
+
             return { id: doc.id, ...postData };
         });
-
-        return posts;
     } catch (error) {
         console.log(error);
+
         return null;
     }
 });
 
-exports.createChat = functions.https.onCall(async (data, context) => {
+
+// Chat
+exports.createChat = functions.https.onCall(async (data) => {
     const { senderId, receiverId, postId } = data;
 
     if (!senderId || !receiverId) {
@@ -285,7 +308,8 @@ exports.createChat = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('invalid-argument', 'Sender and receiver IDs cannot be the same.');
     }
 
-    const newChatRef = admin.firestore().collection('chats').doc();
+    const newChatRef = admin.firestore().collection('chats')
+        .doc();
     const chatId = newChatRef.id;
 
     const newChat = {
@@ -294,18 +318,21 @@ exports.createChat = functions.https.onCall(async (data, context) => {
         messages: [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        participants: [senderId, receiverId]
+        participants: [senderId, receiverId],
     };
 
-    await admin.firestore().collection('chats').doc(chatId).set(newChat);
+    await admin.firestore().collection('chats')
+        .doc(chatId)
+        .set(newChat);
 
     await Promise.all([
-        admin.firestore().collection('users').doc(senderId).update({
-            activeChats: admin.firestore.FieldValue.arrayUnion(chatId)
-        }),
-        admin.firestore().collection('users').doc(receiverId).update({
-            activeChats: admin.firestore.FieldValue.arrayUnion(chatId)
-        })
+        admin.firestore().collection('users')
+            .doc(senderId)
+            .update({ activeChats: admin.firestore.FieldValue.arrayUnion(chatId) }),
+
+        admin.firestore().collection('users')
+            .doc(receiverId)
+            .update({ activeChats: admin.firestore.FieldValue.arrayUnion(chatId) }),
     ]);
 
     return { success: true, message: 'success', chatId };
@@ -315,11 +342,13 @@ exports.getChats = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve chats.');
     }
-    
+
     const userId = context.auth.uid;
 
     try {
-        const userDoc = await admin.firestore().collection('users').doc(userId).get();
+        const userDoc = await admin.firestore().collection('users')
+            .doc(userId)
+            .get();
 
         if (!userDoc.exists) {
             throw new functions.https.HttpsError('not-found', 'User not found.');
@@ -340,14 +369,16 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const messages = chatData.messages || [];
             const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
             const isOurs = lastMessage ? lastMessage.senderId === userId : false;
-            const totalMessages = messages.filter((message) => !message.isRead && message.senderId !== userId).length;
+            const totalMessages = messages.filter(message => !message.isRead && message.senderId !== userId).length;
             const postId = chatData.postId || '';
-            const participantId = chatData.participants.find((id) => id !== userId);
+            const participantId = chatData.participants.find(id => id !== userId);
 
             let postFoto = '';
 
             if (postId) {
-                const postDoc = await admin.firestore().collection('posts').doc(postId).get();
+                const postDoc = await admin.firestore().collection('posts')
+                    .doc(postId)
+                    .get();
 
                 if (postDoc.exists) {
                     const postData = postDoc.data();
@@ -363,7 +394,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const participantName = participantUser.displayName || '';
             const participantPhoto = participantUser.photoURL || '';
 
-            const chat = {
+            return {
                 chatId,
                 lastMessage,
                 isOurs,
@@ -371,13 +402,12 @@ exports.getChats = functions.https.onCall(async (data, context) => {
                 postFoto,
                 participantId,
                 participantName,
-                participantPhoto
+                participantPhoto,
             };
-
-            return chat;
         });
 
         const chatResults = await Promise.all(chatPromises);
+
         chats.push(...chatResults);
 
         return chats;
@@ -396,7 +426,9 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
     const userId = context.auth.uid;
 
     try {
-        const chatDoc = await admin.firestore().collection('chats').doc(chatId).get();
+        const chatDoc = await admin.firestore().collection('chats')
+            .doc(chatId)
+            .get();
 
         if (!chatDoc.exists) {
             throw new functions.https.HttpsError('not-found', 'Chat not found.');
@@ -404,15 +436,17 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
 
         const chatData = chatDoc.data();
         const postId = chatData.postId || '';
-        const participantId = chatData.participants.find((id) => id !== userId);
+        const participantId = chatData.participants.find(id => id !== userId);
 
         let postFoto = '';
         let postTitle = '';
-        let participantName = '';
-        let participantPhoto = '';
+        let participantName;
+        let participantPhoto;
 
         if (postId) {
-            const postDoc = await admin.firestore().collection('posts').doc(postId).get();
+            const postDoc = await admin.firestore().collection('posts')
+                .doc(postId)
+                .get();
 
             if (postDoc.exists) {
                 const postData = postDoc.data();
@@ -434,7 +468,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
         participantName = participantSnapshot.displayName || '';
         participantPhoto = participantSnapshot.photoURL || '';
 
-        const chat = {
+        return {
             chatData,
             postFoto,
             postTitle,
@@ -447,10 +481,8 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
                 id: userId,
                 name: userSnapshot.displayName || '',
                 photoUrl: userSnapshot.photoURL || '',
-            }
+            },
         };
-
-        return chat;
     } catch (error) {
         console.error(error);
         throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
@@ -464,6 +496,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
 // пост
 // Добавить юзерАйди в запрос getUserById
 // Добавить инфу о юзере в пост, по аналогии с getUserById
+
 
 exports.sendMessage = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
@@ -479,7 +512,7 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
     try {
         await chatRef.update({
             messages: admin.firestore.FieldValue.arrayUnion({ senderId, text, timestamp }),
-            updatedAt: timestamp
+            updatedAt: timestamp,
         });
 
         // notification
@@ -500,29 +533,47 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
     }
 });
 
-/// Vsyakoe vspomogatelnoe govno
 
+/**
+ * Фильтрация списка постов по заданному радиусу от заданного местоположения.
+ *
+ * @param {Array} posts - Массив постов, которые требуется отфильтровать.
+ * @param {Object} location - Объект, содержащий координаты заданного местоположения в виде `{latitude, longitude}`.
+ * @param {Number} radius - Радиус в километрах для фильтрации постов.
+ * @returns {Array} - Отфильтрованный массив постов.
+ */
 async function filterPostsByRadius(posts, location, radius) {
-    const {latitude, longitude} = location;
-    const earthRadius = 6371;
+    const EARTH_RADIUS = 6371;
 
-    const filteredPosts = await Promise.all(posts.map(async (post) => {
-        const { lat: postLat, lon: postLng } = post.location;
-        const dLat = toRad(postLat - latitude);
-        const dLng = toRad(postLng - longitude);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(toRad(latitude)) * Math.cos(toRad(postLat)) *
-            Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const distance = earthRadius * c;
-        if (distance <= radius) {
-            return post;
-        }
-    }));
+    const { latitude, longitude } = location;
+
+    // @todo: Нужно либо указать значение по умолчанию для radius, либо выполнять логику ниже только когда есть radius
+    const filteredPosts = await Promise.all(
+        posts.map(async (post) => {
+            const { lat: postLat, lon: postLng } = post.location;
+            const dLat = toRad(postLat - latitude);
+            const dLng = toRad(postLng - longitude);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(latitude)) * Math.cos(toRad(postLat)) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = EARTH_RADIUS * c;
+
+            if (distance <= radius) {
+                return post;
+            }
+        }),
+    );
 
     return filteredPosts.filter(post => post);
 }
 
+/**
+ * Преобразование градусы в радианы.
+ *
+ * @param {Number} degrees - Значение в градусах, которое требуется преобразовать в радианы.
+ * @returns {Number} - Значение в радианах.
+ */
 function toRad(degrees) {
     return degrees * Math.PI / 180;
 }
