@@ -197,26 +197,20 @@ exports.getPosts = functions.https.onCall(async (data) => {
 
     try {
         snapshot = await query.get();
-        const posts = await Promise.all(
-            snapshot.docs.map(async (doc) => {
-                const postData = doc.data();
-
-                if (postData.locationRef) {
-                    const locationId = postData.locationRef;
-                    const locationSnap = await admin.firestore().collection('locations')
-                        .doc(locationId)
-                        .get();
-
-                    postData.location = locationSnap.data();
-                }
-
-                return { id: doc.id, ...postData };
-            }),
-        );
+        const posts = await Promise.all(snapshot.docs.map(async (doc) => {
+            const postData = doc.data();
+            if (postData.locationRef) {
+                const locationId = postData.locationRef;
+                const locationSnap = await admin.firestore().doc(`locations/${locationId}`).get();
+                const locationData = locationSnap.data();
+                postData.location = locationData;
+            }
+            return { id: doc.id, ...postData };
+        }));
 
         if (city) {
-            const filteredPosts = posts.filter(post => post.location && (post.location.city === city));
-
+            const filteredPosts = posts.filter(post => post.location && post.location.city === city);
+            
             if (radius) {
                 return filterPostsByRadius(filteredPosts, location, radius);
             }
@@ -440,8 +434,9 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
 
         let postFoto = '';
         let postTitle = '';
-        let participantName;
-        let participantPhoto;
+        let participantName = '';
+        let participantPhoto = '';
+        let postPrice = 0;
 
         if (postId) {
             const postDoc = await admin.firestore().collection('posts')
@@ -457,6 +452,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
                 }
 
                 postTitle = postData.title || '';
+                postPrice = postData.price || 0; 
             }
         }
 
@@ -472,6 +468,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
             chatData,
             postFoto,
             postTitle,
+            postPrice,
             participant: {
                 id: participantId,
                 name: participantName,

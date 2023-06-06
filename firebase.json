@@ -39,5 +39,16 @@
         "function": "verifyEmail"
       }
     ]
+  },
+  "emulators": {
+    "functions": {
+      "port": 5005
+    },
+    "firestore": {
+      "port": 5002
+    },
+    "auth": {
+      "port": 9099
+    }
   }
 }
