@@ -378,7 +378,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const postId = chatData.postId || '';
             const participantId = chatData.participants.find(id => id !== userId);
 
-            let postFoto = '';
+            let postPhoto = '';
             let postTitle = '';
             
             if (postId) {
@@ -391,7 +391,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
                     const images = postData.images || [];
 
                     if (images.length > 0) {
-                        postFoto = images[0];
+                        postPhoto = images[0];
                     }
                    postTitle = postData.title;
                 }
@@ -406,7 +406,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
                 lastMessage,
                 isOurs,
                 totalMessages,
-                postFoto,
+                postPhoto: postPhoto,
                 postTitle,
                 participant: {
                     id: participantId,
@@ -448,7 +448,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
         const postId = chatData.postId || '';
         const participantId = chatData.participants.find(id => id !== userId);
 
-        let postFoto = '';
+        let postPhoto = '';
         let postTitle = '';
         let participantName = '';
         let participantPhoto = '';
@@ -464,7 +464,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
                 const images = postData.images || [];
 
                 if (images.length > 0) {
-                    postFoto = images[0];
+                    postPhoto = images[0];
                 }
 
                 postTitle = postData.title || '';
@@ -482,9 +482,10 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
 
         return {
             chatData,
-            postFoto,
+            postPhoto: postPhoto,
             postTitle,
             postPrice,
+            postId,
             participant: {
                 id: participantId,
                 name: participantName,
@@ -521,12 +522,23 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
     const timestamp = admin.firestore.FieldValue.serverTimestamp();
 
     const chatRef = admin.firestore().doc(`chats/${chatId}`);
+    const messageRef = chatRef.collection('messages').doc(); // Create a new document reference
+
+    const messageData = {
+        id: messageRef.id, // Set the id field with the value of the document's ref.id
+        senderId,
+        text,
+        timestamp
+    };
 
     try {
-        await chatRef.update({
-            messages: admin.firestore.FieldValue.arrayUnion({ senderId, text, timestamp }),
-            updatedAt: timestamp,
-        });
+        await Promise.all([
+            messageRef.set(messageData),
+            chatRef.update({
+                messages: admin.firestore.FieldValue.arrayUnion(messageData),
+                updatedAt: timestamp,
+            }),
+        ]);
 
         // notification
         // const payload = {
