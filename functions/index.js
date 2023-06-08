@@ -291,52 +291,64 @@ exports.getPostsByUser = functions.https.onCall(async (data) => {
 
 
 // Chat
-exports.createChat = functions.https.onCall(async (data) => {
-    const { senderId, receiverId, postId } = data;
-
-    if (!senderId || !receiverId) {
-        throw new functions.https.HttpsError('invalid-argument', 'Sender and receiver IDs are required.');
-    }
-
-    if (senderId === receiverId) {
-        throw new functions.https.HttpsError('invalid-argument', 'Sender and receiver IDs cannot be the same.');
-    }
-
-    const newChatRef = admin.firestore().collection('chats')
-        .doc();
-    const chatId = newChatRef.id;
-
-    const newChat = {
-        chatId,
-        postId,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        participants: [senderId, receiverId],
-    };
+    exports.createChat = functions.https.onCall(async (data) => {
+        const { senderId, receiverId, postId } = data;
     
-    await newChatRef.set(newChat);
+        if (!senderId || !receiverId) {
+            throw new functions.https.HttpsError('invalid-argument', 'Sender and receiver IDs are required.');
+        }
+    
+        if (senderId === receiverId) {
+            throw new functions.https.HttpsError('invalid-argument', 'Sender and receiver IDs cannot be the same.');
+        }
+        
+        const existingChatQuery = await admin.firestore().collection('chats')
+            .where('postId', '==', postId)
+            .where('participants', 'array-contains-any', [senderId, receiverId])
+            .limit(1)
+            .get();
 
-    newChatRef.collection('messages');
-
-    await Promise.all([
-        admin.firestore().collection('users')
-            .doc(senderId)
-            .update({ activeChats: admin.firestore.FieldValue.arrayUnion(chatId) }),
-
-        admin.firestore().collection('users')
-            .doc(receiverId)
-            .update({ activeChats: admin.firestore.FieldValue.arrayUnion(chatId) }),
-    ]);
-
-    return { success: true, message: 'success', chatId };
-});
+        if (!existingChatQuery.empty) {
+            const existingChat = existingChatQuery.docs[0].data();
+            const chatId = existingChat.ref.id;
+            return { success: true, message: 'success', chatId };
+        }
+    
+        const newChatRef = admin.firestore().collection('chats')
+            .doc();
+        const chatId = newChatRef.id;
+    
+        const newChat = {
+            chatId,
+            postId,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            participants: [senderId, receiverId],
+        };
+        
+        await newChatRef.set(newChat);
+    
+        newChatRef.collection('messages');
+    
+        await Promise.all([
+            admin.firestore().collection('users')
+                .doc(senderId)
+                .update({ activeChats: admin.firestore.FieldValue.arrayUnion(chatId) }),
+    
+            admin.firestore().collection('users')
+                .doc(receiverId)
+                .update({ activeChats: admin.firestore.FieldValue.arrayUnion(chatId) }),
+        ]);
+    
+        return { success: true, message: 'success', chatId };
+    });
 
 exports.getChats = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve chats.');
-    }
+    // if (!context.auth) {
+    //     throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve chats.');
+    // }
 
-    const userId = context.auth.uid;
+    const userId = "vwZm7YNsnqW5Xf9JjsVuxtO2YTl2";//context.auth.uid;
 
     try {
         const userDoc = await admin.firestore().collection('users')
@@ -367,7 +379,8 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const participantId = chatData.participants.find(id => id !== userId);
 
             let postFoto = '';
-
+            let postTitle = '';
+            
             if (postId) {
                 const postDoc = await admin.firestore().collection('posts')
                     .doc(postId)
@@ -380,22 +393,26 @@ exports.getChats = functions.https.onCall(async (data, context) => {
                     if (images.length > 0) {
                         postFoto = images[0];
                     }
+                   postTitle = postData.title;
                 }
             }
 
             const participantUser = await admin.auth().getUser(participantId);
             const participantName = participantUser.displayName || '';
             const participantPhoto = participantUser.photoURL || '';
-
+            
             return {
                 chatId,
                 lastMessage,
                 isOurs,
                 totalMessages,
                 postFoto,
-                participantId,
-                participantName,
-                participantPhoto,
+                postTitle,
+                participant: {
+                    id: participantId,
+                    name: participantName,
+                    photoUrl: participantPhoto,
+                }
             };
         });
 
