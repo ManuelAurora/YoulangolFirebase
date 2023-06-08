@@ -194,6 +194,18 @@ exports.getPosts = functions.https.onCall(async (data) => {
     query = query.orderBy('createdAt', 'desc');
 
     let snapshot;
+    
+    if (page < 0) {
+        return { success: false, message: 'Page cannot be below 0' };
+    } else if (location == null) {
+        return  { success: false, message: 'You need to have location object' };
+    } else if (location.city == null) {
+        return  { success: false, message: 'City should not be empty' };
+    } else if (location.city == null) {
+        return  { success: false, message: 'City should not be empty' };
+    } else if (page == null) {
+        return  { success: false, message: 'Page should not be empty' };
+    }
 
     try {
         snapshot = await query.get();
