@@ -356,11 +356,11 @@ exports.getPostsByUser = functions.https.onCall(async (data) => {
     });
 
 exports.getChats = functions.https.onCall(async (data, context) => {
-    // if (!context.auth) {
-    //     throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve chats.');
-    // }
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve chats.');
+    }
 
-    const userId = "vwZm7YNsnqW5Xf9JjsVuxtO2YTl2";//context.auth.uid;
+    const userId = context.auth.uid;
 
     try {
         const userDoc = await admin.firestore().collection('users')
@@ -531,11 +531,11 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
 
     const { text, chatId } = data;
     const senderId = context.auth.uid;
-    const timestamp = admin.firestore.FieldValue.serverTimestamp();
+    const timestamp = admin.firestore.Timestamp.now().toMillis()
 
     const chatRef = admin.firestore().doc(`chats/${chatId}`);
-    const messageRef = chatRef.collection('messages').doc(); // Create a new document reference
-
+    const messageRef = chatRef.collection('messages').doc(); // Create a new document reference 
+    
     const messageData = {
         id: messageRef.id, // Set the id field with the value of the document's ref.id
         senderId,
