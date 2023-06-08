@@ -385,6 +385,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const chatId = doc.id;
             const messages = chatData.messages || [];
             const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+            let lastMessageTimestamp = 0;
             const isOurs = lastMessage ? lastMessage.senderId === userId : false;
             const totalMessages = messages.filter(message => !message.isRead && message.senderId !== userId).length;
             const postId = chatData.postId || '';
@@ -392,6 +393,10 @@ exports.getChats = functions.https.onCall(async (data, context) => {
 
             let postPhoto = '';
             let postTitle = '';
+            
+            if (lastMessage != null) {
+                lastMessageTimestamp = lastMessage.timestamp;
+            }
             
             if (postId) {
                 const postDoc = await admin.firestore().collection('posts')
@@ -416,6 +421,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             return {
                 chatId,
                 lastMessage,
+                lastMessageTimestamp,
                 isOurs,
                 totalMessages,
                 postPhoto: postPhoto,
