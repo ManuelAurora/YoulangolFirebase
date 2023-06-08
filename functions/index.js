@@ -309,15 +309,14 @@ exports.createChat = functions.https.onCall(async (data) => {
     const newChat = {
         chatId,
         postId,
-        messages: [],
         createdAt: Date.now(),
         updatedAt: Date.now(),
         participants: [senderId, receiverId],
     };
+    
+    await newChatRef.set(newChat);
 
-    await admin.firestore().collection('chats')
-        .doc(chatId)
-        .set(newChat);
+    newChatRef.collection('messages');
 
     await Promise.all([
         admin.firestore().collection('users')
