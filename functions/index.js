@@ -73,41 +73,50 @@ exports.createPost = functions.https.onCall(async (data, context) => {
 
     const { title, description, price, categoryId, location, images } = data;
 
+    // Валидация полей
+    if (!title || !description || !price || !categoryId || !location || !images) {
+        throw new functions.https.HttpsError('invalid-argument', 'Missing required fields.');
+    }
+
     const userId = context.auth.uid;
 
-    // Create a new location document in the 'locations' collection
-    const newLocationRef = await admin.firestore().collection('locations')
-        .add(location);
+    try {
+        const newLocationRef = await admin.firestore().collection('locations')
+            .add(location);
 
-    // Upload images to Cloud Storage
-    const imageUrls = await Promise.all(
-        images.map(async (imageData, i) => {
-            const fileName = `post_${newPostRef.id}_${i}`;
+        // Upload images to Cloud Storage
+        const imageUrls = await Promise.all(
+            images.map(async (imageData, i) => {
+                const fileName = `post_${newLocationRef.id}_${i}`;
 
-            const file = admin.storage().bucket()
-                .file(fileName);
+                const file = admin.storage().bucket()
+                    .file(fileName);
 
-            await file.save(imageData.buffer, { metadata: { contentType: imageData.mimeType } });
+                await file.save(imageData.buffer, { metadata: { contentType: imageData.mimeType } });
 
-            return file.publicUrl();
-        }),
-    );
+                return file.publicUrl();
+            }),
+        );
 
-    const newPost = {
-        title,
-        description,
-        price,
-        categoryId,
-        locationRef: newLocationRef,
-        images: imageUrls,
-        userId,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+        const newPost = {
+            title,
+            description,
+            price,
+            categoryId,
+            locationRef: newLocationRef,
+            images: imageUrls,
+            userId,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
 
-    const newPostRef = await admin.firestore().collection('posts')
-        .add(newPost);
+        const newPostRef = await admin.firestore().collection('posts')
+            .add(newPost);
 
-    return { id: newPostRef.id };
+        return { id: newPostRef.id };
+    } catch (error) {
+        // Обработка ошибок
+        throw new functions.https.HttpsError('internal', 'An error occurred while creating the post.', error.message);
+    }
 });
 
 exports.editPost = functions.https.onCall(async (data, context) => {
@@ -194,7 +203,7 @@ exports.getPosts = functions.https.onCall(async (data) => {
     query = query.orderBy('createdAt', 'desc');
 
     let snapshot;
-    
+
     if (page < 0) {
         return { success: false, message: 'Page cannot be below 0' };
     } else if (location == null) {
@@ -222,7 +231,7 @@ exports.getPosts = functions.https.onCall(async (data) => {
 
         if (city) {
             const filteredPosts = posts.filter(post => post.location && post.location.city === city);
-            
+
             if (radius) {
                 return filterPostsByRadius(filteredPosts, location, radius);
             }
@@ -305,15 +314,15 @@ exports.getPostsByUser = functions.https.onCall(async (data) => {
 // Chat
     exports.createChat = functions.https.onCall(async (data) => {
         const { senderId, receiverId, postId } = data;
-    
+
         if (!senderId || !receiverId) {
             throw new functions.https.HttpsError('invalid-argument', 'Sender and receiver IDs are required.');
         }
-    
+
         if (senderId === receiverId) {
             throw new functions.https.HttpsError('invalid-argument', 'Sender and receiver IDs cannot be the same.');
         }
-        
+
         const existingChatQuery = await admin.firestore().collection('chats')
             .where('postId', '==', postId)
             .where('participants', 'array-contains-any', [senderId, receiverId])
@@ -325,11 +334,11 @@ exports.getPostsByUser = functions.https.onCall(async (data) => {
             const chatId = existingChat.ref.id;
             return { success: true, message: 'success', chatId };
         }
-    
+
         const newChatRef = admin.firestore().collection('chats')
             .doc();
         const chatId = newChatRef.id;
-    
+
         const newChat = {
             chatId,
             postId,
@@ -337,21 +346,21 @@ exports.getPostsByUser = functions.https.onCall(async (data) => {
             updatedAt: Date.now(),
             participants: [senderId, receiverId],
         };
-        
+
         await newChatRef.set(newChat);
-    
+
         newChatRef.collection('messages');
-    
+
         await Promise.all([
             admin.firestore().collection('users')
                 .doc(senderId)
                 .update({ activeChats: admin.firestore.FieldValue.arrayUnion(chatId) }),
-    
+
             admin.firestore().collection('users')
                 .doc(receiverId)
                 .update({ activeChats: admin.firestore.FieldValue.arrayUnion(chatId) }),
         ]);
-    
+
         return { success: true, message: 'success', chatId };
     });
 
@@ -393,11 +402,11 @@ exports.getChats = functions.https.onCall(async (data, context) => {
 
             let postPhoto = '';
             let postTitle = '';
-            
+
             if (lastMessage != null) {
                 lastMessageTimestamp = lastMessage.timestamp;
             }
-            
+
             if (postId) {
                 const postDoc = await admin.firestore().collection('posts')
                     .doc(postId)
@@ -417,7 +426,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const participantUser = await admin.auth().getUser(participantId);
             const participantName = participantUser.displayName || '';
             const participantPhoto = participantUser.photoURL || '';
-            
+
             return {
                 chatId,
                 lastMessage,
@@ -486,7 +495,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
                 }
 
                 postTitle = postData.title || '';
-                postPrice = postData.price || 0; 
+                postPrice = postData.price || 0;
             }
         }
 
@@ -540,8 +549,8 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
     const timestamp = admin.firestore.Timestamp.now().toMillis()
 
     const chatRef = admin.firestore().doc(`chats/${chatId}`);
-    const messageRef = chatRef.collection('messages').doc(); // Create a new document reference 
-    
+    const messageRef = chatRef.collection('messages').doc(); // Create a new document reference
+
     const messageData = {
         id: messageRef.id, // Set the id field with the value of the document's ref.id
         senderId,
