@@ -88,7 +88,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
                 const base64Data = imageData.base64;
                 const mimeType = imageData.mimeType;
                 const buffer = Buffer.from(base64Data, 'base64');
-                const fileName = `post_${newLocationRef.id}_${Date.now()}`;
+                const fileName = `post_${newLocationRef.id}_${Date.now()}.png`;
 
                 const file = admin.storage().bucket().file(fileName);
                 await file.save(buffer, { metadata: { contentType: mimeType }, predefinedAcl: 'publicRead' });
