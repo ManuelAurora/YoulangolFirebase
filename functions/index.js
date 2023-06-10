@@ -73,7 +73,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
 
     const { title, description, price, categoryId, location, images } = data;
 
-    // Валидация полей
+    // Validation
     if (!title || !description || !price || !categoryId || !location || !images) {
         throw new functions.https.HttpsError('invalid-argument', 'Missing required fields.');
     }
@@ -81,21 +81,21 @@ exports.createPost = functions.https.onCall(async (data, context) => {
     const userId = context.auth.uid;
 
     try {
-        const newLocationRef = await admin.firestore().collection('locations')
-            .add(location);
+        const newLocationRef = await admin.firestore().collection('locations').add(location);
 
-        // Upload images to Cloud Storage
         const imageUrls = await Promise.all(
-            images.map(async (imageData, i) => {
-                const fileName = `post_${newLocationRef.id}_${i}`;
+            images.map(async (imageData) => {
+                const base64Data = imageData.base64;
+                const mimeType = imageData.mimeType;
+                const buffer = Buffer.from(base64Data, 'base64');
+                const fileName = `post_${newLocationRef.id}_${Date.now()}`;
 
-                const file = admin.storage().bucket()
-                    .file(fileName);
+                const file = admin.storage().bucket().file(fileName);
+                await file.save(buffer, { metadata: { contentType: mimeType }, predefinedAcl: 'publicRead' });
 
-                await file.save(imageData.buffer, { metadata: { contentType: imageData.mimeType } });
-
-                return file.publicUrl();
-            }),
+                const url = `https://storage.googleapis.com/${file.bucket.name}/${file.name}`;
+                return url;
+            })
         );
 
         const newPost = {
@@ -109,12 +109,10 @@ exports.createPost = functions.https.onCall(async (data, context) => {
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         };
 
-        const newPostRef = await admin.firestore().collection('posts')
-            .add(newPost);
+        const newPostRef = await admin.firestore().collection('posts').add(newPost);
 
         return { id: newPostRef.id };
     } catch (error) {
-        // Обработка ошибок
         throw new functions.https.HttpsError('internal', 'An error occurred while creating the post.', error.message);
     }
 });
