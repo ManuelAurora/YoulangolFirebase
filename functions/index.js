@@ -1,12 +1,9 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-let serviceAccount = require("./src/service-account.json");
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: "https://youlangol-default-rtdb.firebaseio.com",
-    storageBucket: 'youlangol.appspot.com'
-});
+admin.initializeApp();
+
+const bucket = admin.storage().bucket();
 
 // User
 exports.registerUser = functions.https.onCall(async (data) => {
@@ -88,22 +85,29 @@ exports.createPost = functions.https.onCall(async (data, context) => {
     try {
         const newLocationRef = await admin.firestore().collection('locations').add(location);
 
-        const imageUrls = await Promise.all(
-            images.map(async (imageData) => {
-                const fileName = `post_${newLocationRef.id}_${Date.now()}`;
-                const imageUrl = await uploadImage(imageData.base64, fileName);
-                return { imageUrl };
-            })
+        const uploadedImages = await Promise.all(
+            images.map(async ({ base64, mimeType }) => {
+                const fileName = `post_${newLocationRef.id}_${Date.now()}.${mimeType.split('/')[1]}`;
+
+                const base64WithoutPrefix = base64.replace(/^data:image\/[^;]+;base64,/, '');
+
+                const imageBuffer = Buffer.from(base64WithoutPrefix, 'base64');
+
+                await bucket.file(fileName).save(imageBuffer, { metadata: { contentType: mimeType } });
+
+                return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+            }),
         );
 
+
         const newPost = {
-            status: "Open",
+            status: 'Open',
             title,
             description,
             price,
             categoryId,
             locationRef: newLocationRef,
-            images: imageUrls,
+            images: uploadedImages,
             userId,
             createdAt: admin.firestore.Timestamp.now().toMillis(),
         };
@@ -683,89 +687,7 @@ async function filterPostsByRadius(posts, location, radius) {
  *
  * @param {Number} degrees - Значение в градусах, которое требуется преобразовать в радианы.
  * @returns {Number} - Значение в радианах.
- */ 
+ */
 function toRad(degrees) {
     return degrees * Math.PI / 180;
 }
-
-const uploadImage = async (base64Data, fileName) => {
-    const bucket = admin.storage().bucket();
-    const buffer = Buffer.from(base64Data, 'base64');
-    const file = bucket.file(fileName);
-
-    await new Promise((resolve, reject) => {
-        const blobStream = file.createWriteStream({
-            metadata: {
-                contentType: 'image/png', // Replace with the appropriate content type
-            }
-        });
-
-        blobStream.on('error', (error) => {
-            reject(error);
-        });
-
-        blobStream.on('finish', () => {
-            resolve();
-        });
-
-        blobStream.end(buffer);
-    });
-
-    const [url] = await file.getSignedUrl({
-        action: 'read',
-        expires: '03-01-2500',
-    });
-
-    return url;
-};
-
-// const uploadImage = async (data) => {
-//     const { imageData, fileName, contentType } = data;
-//
-//     try {
-//         // Convert base64 data to buffer
-//         const buffer = Buffer.from(imageData, 'base64');
-//
-//         // Define a temporary file path
-//         const tempFilePath = path.join(os.tmpdir(), fileName);
-//
-//         // Write the buffer to a temporary file
-//         await fs.promises.writeFile(tempFilePath, buffer);
-//
-//         // Upload the file to Firebase Storage
-//         const bucket = getStorage().bucket();
-//         await bucket.upload(tempFilePath, {
-//             destination: fileName,
-//             metadata: {
-//                 contentType: contentType,
-//             },
-//         });
-//
-//         // Delete the temporary file
-//         await fs.promises.unlink(tempFilePath);
-//
-//         // Get the download URL of the uploaded file
-//         const [url] = await bucket.file(fileName).getSignedUrl({
-//             action: 'read',
-//             expires: '03-01-2500',
-//         });
-//
-//         // Return the download URL
-//         return { url };
-//     } catch (error) {
-//         console.error('Error uploading image:', error);
-//         throw new functions.https.HttpsError('internal', 'An error occurred while uploading the image.');
-//     }
-// };
-
-const dataURItoBlob = (dataURI) => {
-    const byteString = atob(dataURI.split(',')[1]);
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-    }
-    return new Blob([ab], { type: 'image/png' });
-};
-
-
