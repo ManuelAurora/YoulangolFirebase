@@ -1,10 +1,5 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-const { getStorage } = require('firebase-admin/storage');
-const path = require('path');
-const os = require('os');
-const fs = require('fs');
-const streamToBuffer = require('stream-to-buffer');
 let serviceAccount = require("./src/service-account.json");
 
 admin.initializeApp({
@@ -102,6 +97,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
         );
 
         const newPost = {
+            status: "Open",
             title,
             description,
             price,
@@ -249,6 +245,66 @@ exports.getPosts = functions.https.onCall(async (data) => {
         console.log(error);
 
         return null;
+    }
+});
+
+exports.closePost = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to close a post.');
+    }
+
+    const postId = data.postId;
+
+    try {
+        const postRef = admin.firestore().collection('posts').doc(postId);
+
+        await postRef.update({
+            status: 'Closed'
+        });
+
+        return { message: 'Post closed successfully.' };
+    } catch (error) {
+        throw new functions.https.HttpsError('internal', 'An error occurred while closing the post.', error.message);
+    }
+});
+
+exports.purchasePost = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to purchase a post.');
+    }
+
+    const postId = data.postId;
+
+    try {
+        const postRef = admin.firestore().collection('posts').doc(postId);
+
+        await postRef.update({
+            status: 'InReserve'
+        });
+
+        return { message: 'Post purchased successfully.' };
+    } catch (error) {
+        throw new functions.https.HttpsError('internal', 'An error occurred while purchasing the post.', error.message);
+    }
+});
+
+exports.blockPost = functions.https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.token.admin) {
+        throw new functions.https.HttpsError('permission-denied', 'You do not have permission to block a post.');
+    }
+
+    const postId = data.postId;
+
+    try {
+        const postRef = admin.firestore().collection('posts').doc(postId);
+
+        await postRef.update({
+            status: 'Blocked'
+        });
+
+        return { message: 'Post blocked successfully.' };
+    } catch (error) {
+        throw new functions.https.HttpsError('internal', 'An error occurred while blocking the post.', error.message);
     }
 });
 
