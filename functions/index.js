@@ -1,7 +1,17 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { getStorage } = require('firebase-admin/storage');
+const path = require('path');
+const os = require('os');
+const fs = require('fs');
+const streamToBuffer = require('stream-to-buffer');
+let serviceAccount = require("./src/service-account.json");
 
-admin.initializeApp();
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: "https://youlangol-default-rtdb.firebaseio.com",
+    storageBucket: 'youlangol.appspot.com'
+});
 
 // User
 exports.registerUser = functions.https.onCall(async (data) => {
@@ -85,16 +95,9 @@ exports.createPost = functions.https.onCall(async (data, context) => {
 
         const imageUrls = await Promise.all(
             images.map(async (imageData) => {
-                const base64Data = imageData.base64;
-                const mimeType = imageData.mimeType;
-                const buffer = Buffer.from(base64Data, 'base64');
-                const fileName = `post_${newLocationRef.id}_${Date.now()}.png`;
-
-                const file = admin.storage().bucket().file(fileName);
-                await file.save(buffer, { metadata: { contentType: mimeType }, predefinedAcl: 'publicRead' });
-
-                const url = `https://storage.googleapis.com/${file.bucket.name}/${file.name}`;
-                return url;
+                const fileName = `post_${newLocationRef.id}_${Date.now()}`;
+                const imageUrl = await uploadImage(imageData.base64, fileName);
+                return { imageUrl };
             })
         );
 
@@ -106,7 +109,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
             locationRef: newLocationRef,
             images: imageUrls,
             userId,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            createdAt: admin.firestore.Timestamp.now().toMillis(),
         };
 
         const newPostRef = await admin.firestore().collection('posts').add(newPost);
@@ -584,6 +587,7 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
 });
 
 
+
 /**
  * Фильтрация списка постов по заданному радиусу от заданного местоположения.
  *
@@ -623,8 +627,89 @@ async function filterPostsByRadius(posts, location, radius) {
  *
  * @param {Number} degrees - Значение в градусах, которое требуется преобразовать в радианы.
  * @returns {Number} - Значение в радианах.
- */
+ */ 
 function toRad(degrees) {
     return degrees * Math.PI / 180;
 }
+
+const uploadImage = async (base64Data, fileName) => {
+    const bucket = admin.storage().bucket();
+    const buffer = Buffer.from(base64Data, 'base64');
+    const file = bucket.file(fileName);
+
+    await new Promise((resolve, reject) => {
+        const blobStream = file.createWriteStream({
+            metadata: {
+                contentType: 'image/png', // Replace with the appropriate content type
+            }
+        });
+
+        blobStream.on('error', (error) => {
+            reject(error);
+        });
+
+        blobStream.on('finish', () => {
+            resolve();
+        });
+
+        blobStream.end(buffer);
+    });
+
+    const [url] = await file.getSignedUrl({
+        action: 'read',
+        expires: '03-01-2500',
+    });
+
+    return url;
+};
+
+// const uploadImage = async (data) => {
+//     const { imageData, fileName, contentType } = data;
+//
+//     try {
+//         // Convert base64 data to buffer
+//         const buffer = Buffer.from(imageData, 'base64');
+//
+//         // Define a temporary file path
+//         const tempFilePath = path.join(os.tmpdir(), fileName);
+//
+//         // Write the buffer to a temporary file
+//         await fs.promises.writeFile(tempFilePath, buffer);
+//
+//         // Upload the file to Firebase Storage
+//         const bucket = getStorage().bucket();
+//         await bucket.upload(tempFilePath, {
+//             destination: fileName,
+//             metadata: {
+//                 contentType: contentType,
+//             },
+//         });
+//
+//         // Delete the temporary file
+//         await fs.promises.unlink(tempFilePath);
+//
+//         // Get the download URL of the uploaded file
+//         const [url] = await bucket.file(fileName).getSignedUrl({
+//             action: 'read',
+//             expires: '03-01-2500',
+//         });
+//
+//         // Return the download URL
+//         return { url };
+//     } catch (error) {
+//         console.error('Error uploading image:', error);
+//         throw new functions.https.HttpsError('internal', 'An error occurred while uploading the image.');
+//     }
+// };
+
+const dataURItoBlob = (dataURI) => {
+    const byteString = atob(dataURI.split(',')[1]);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: 'image/png' });
+};
+
 
