@@ -222,10 +222,10 @@ exports.getPosts = functions.https.onCall(async (data) => {
         const posts = await Promise.all(snapshot.docs.map(async (doc) => {
             const postData = doc.data();
             if (postData.locationRef) {
-                const locationId = postData.locationRef;
-                const locationSnap = await admin.firestore().doc(`locations/${locationId}`).get();
-                const locationData = locationSnap.data();
+                const locationId = await postData.locationRef.get();
+                const locationData = locationId.data();
                 postData.location = locationData;
+                postData.locationRef = null;
             }
             return { id: doc.id, ...postData };
         }));
@@ -328,6 +328,13 @@ exports.getPostById = functions.https.onCall(async (data) => {
         const userRecord = await admin.auth().getUser(data.userId);
         const creationTime = userRecord.metadata.creationTime;
 
+        if (data.locationRef) {
+            const locationId = await data.locationRef.get();
+            const locationData = locationId.data();
+            data.location = locationData;
+            data.locationRef = null;
+        }
+
         return {
             data,
             user: {
@@ -359,10 +366,17 @@ exports.getPostsByUser = functions.https.onCall(async (data) => {
     try {
         snapshot = await query.get();
 
-        return snapshot.docs.map((doc) => {
+        return snapshot.docs.map(async (doc) => {
             const postData = doc.data();
 
-            return { id: doc.id, ...postData };
+            if (postData.locationRef) {
+                const locationId = await postData.locationRef.get();
+                const locationData = locationId.data();
+                postData.location = locationData;
+                postData.locationRef = null;
+            }
+
+            return {id: doc.id, ...postData};
         });
     } catch (error) {
         console.log(error);
