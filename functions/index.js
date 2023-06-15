@@ -85,21 +85,38 @@ exports.createPost = functions.https.onCall(async (data, context) => {
     try {
         const newLocationRef = await admin.firestore().collection('locations').add(location);
 
+        const userFolder = userId;
+
+        // Check if folder exists
+        const userFolderRef = bucket.file( `User_${userFolder}/`);
+
+        const [userFolderExists] = await userFolderRef.exists();
+        if (!userFolderExists) {
+            await userFolderRef.save('');
+        }
+
+        const newPostDocRef = await admin.firestore().collection('posts').add({});
+
         const uploadedImages = await Promise.all(
             images.map(async ({ base64, mimeType }) => {
-                const fileName = `post_${newLocationRef.id}_${Date.now()}.${mimeType.split('/')[1]}`;
-
+                const fileName = `post_${newPostDocRef.id}_${Date.now()}.${mimeType.split('/')[1]}`;
                 const base64WithoutPrefix = base64.replace(/^data:image\/[^;]+;base64,/, '');
-
                 const imageBuffer = Buffer.from(base64WithoutPrefix, 'base64');
 
-                await bucket.file(fileName).save(imageBuffer, { metadata: { contentType: mimeType } });
+                // Create folder
+                const postFolderRef = bucket.file(`User_${userFolder}/Post_${newPostDocRef.id}/`);
+                const [postFolderExists] = await postFolderRef.exists();
+                if (!postFolderExists) {
+                    await postFolderRef.save('');
+                }
 
-                return `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+                const imageFileRef = bucket.file(`User_${userFolder}/Post_${newPostDocRef.id}/${fileName}`);
+                await imageFileRef.save(imageBuffer, { metadata: { contentType: mimeType } });
+
+                return `https://storage.googleapis.com/${bucket.name}/${imageFileRef.name}`;
             }),
         );
-
-
+        
         const newPost = {
             status: 'Open',
             title,
@@ -112,9 +129,9 @@ exports.createPost = functions.https.onCall(async (data, context) => {
             createdAt: admin.firestore.Timestamp.now().toMillis(),
         };
 
-        const newPostRef = await admin.firestore().collection('posts').add(newPost);
-
-        return { id: newPostRef.id };
+        await newPostDocRef.set(newPost);
+        
+        return { id: newPostDocRef.id };
     } catch (error) {
         throw new functions.https.HttpsError('internal', 'An error occurred while creating the post.', error.message);
     }
