@@ -631,6 +631,44 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
     }
 });
 
+exports.markChatAsRead = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to mark the chat as read.');
+    }
+
+    const { chatId } = data;
+    const userId = context.auth.uid;
+
+    try {
+        const chatRef = admin.firestore().collection('chats').doc(chatId);
+        const chatDoc = await chatRef.get();
+
+        if (!chatDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Chat not found');
+        }
+
+        const chatData = chatDoc.data();
+
+        if (chatData.user1 !== userId && chatData.user2 !== userId) {
+            throw new functions.https.HttpsError('permission-denied', 'You do not have permission to mark this chat as read');
+        }
+
+        const messagesRef = chatRef.collection('messages');
+        const querySnapshot = await messagesRef.where('isRead', '==', false).get();
+
+        const updatePromises = querySnapshot.docs.map(doc => {
+            const messageRef = messagesRef.doc(doc.id);
+            return messageRef.update({ isRead: true });
+        });
+
+        await Promise.all(updatePromises);
+
+        return { success: true, message: 'Chat marked as read' };
+    } catch (error) {
+        throw new functions.https.HttpsError('internal', 'An error occurred while marking the chat as read.', error.message);
+    }
+});
+
 
 // 0. Список чатов по id юзера (id чата, последнее сообщение, пропертю на сообщение bool, количество непрочитанных. фотка товара, фотка отправителя, айди отправителя, имя)
 // 1. Добавить запрос чата по id (можно обнулять непрочитанные сообщения), инфу о юзере и товаре
@@ -656,7 +694,8 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
         id: messageRef.id, // Set the id field with the value of the document's ref.id
         senderId,
         text,
-        timestamp
+        timestamp,
+        isRead: false
     };
 
     try {
