@@ -499,7 +499,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const lastMessage = messages > 0 ? messages[messages.length - 1] : null;
             let lastMessageTimestamp = 0;
             const isOurs = lastMessage ? lastMessage.senderId === userId : false;
-            const totalMessages = messages.filter(message => !message.isRead && message.senderId !== userId).length;
+            const totalMessages = messages.filter(message => !message.isRead && (message.senderId !== userId)).length;
             const postId = chatData.postId || '';
             const participantId = chatData.participants.find(id => id !== userId);
 
