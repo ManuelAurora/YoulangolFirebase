@@ -496,7 +496,8 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const messagesRef = admin.firestore().collection('chats').doc(chatId).collection('messages');
             const messagesSnapshot = await messagesRef.get();
             const messages = messagesSnapshot.docs.map(doc => doc.data());
-            const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+            messages.sort((a, b) => b.timestamp - a.timestamp);
+            const lastMessage = messages.length > 0 ? messages[0] : null;
             let lastMessageTimestamp = 0;
             const isOurs = lastMessage ? lastMessage.senderId === userId : false;
             const totalMessages = messages.filter(message => !message.isRead && (message.senderId !== userId)).length;
