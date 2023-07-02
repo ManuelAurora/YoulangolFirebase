@@ -431,13 +431,12 @@ exports.getPostsByUser = functions.https.onCall(async (data) => {
             .get();
 
         if (!existingChatQuery.empty) {
-            const existingChat = existingChatQuery.docs[0].data();
+            const existingChat = existingChatQuery.docs[0];
             const chatId = existingChat.ref.id;
             return { success: true, message: 'success', chatId };
         }
 
-        const newChatRef = admin.firestore().collection('chats')
-            .doc();
+        const newChatRef = admin.firestore().collection('chats').doc();
         const chatId = newChatRef.id;
 
         const newChat = {
