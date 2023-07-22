@@ -392,7 +392,7 @@ exports.getPostsByUser = functions.https.onCall(async (data) => {
     try {
         snapshot = await query.get();
 
-        return snapshot.docs.map(async (doc) => {
+        let dataToReturn = await Promise.all(snapshot.docs.map(async (doc) => {
             const postData = doc.data();
 
             if (postData.locationRef) {
@@ -403,7 +403,9 @@ exports.getPostsByUser = functions.https.onCall(async (data) => {
             }
 
             return {id: doc.id, ...postData};
-        });
+        }));
+        
+        return dataToReturn;
     } catch (error) {
         console.log(error);
 
