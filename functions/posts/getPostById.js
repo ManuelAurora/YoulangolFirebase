@@ -1,11 +1,14 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-
 exports.getPostById = functions.https.onCall(async (data) => {
-    const postId = data.id;
-
     try {
+        const postId = data.id;
+
+        if (!postId) {
+            throw new functions.https.HttpsError('invalid-argument', 'Post ID is required.');
+        }
+
         const doc = await admin.firestore().collection('posts')
             .doc(postId)
             .get();
@@ -14,18 +17,19 @@ exports.getPostById = functions.https.onCall(async (data) => {
             throw new functions.https.HttpsError('not-found', 'Post not found.');
         }
 
-        const data = doc.data();
-        const userRecord = await admin.auth().getUser(data.userId);
+        const postData = doc.data();
+        const userRecord = await admin.auth().getUser(postData.userId);
         const creationTime = userRecord.metadata.creationTime;
 
-        if (data.locationRef) {
-            const locationId = await data.locationRef.get();
-            data.location = locationId.data();
-            data.locationRef = null;
+        if (postData.locationRef) {
+            const locationDoc = await postData.locationRef.get();
+
+            postData.location = locationDoc.data();
+            postData.locationRef = null;
         }
 
         return {
-            data,
+            data: postData,
             user: {
                 creationTime,
                 emailVerified: userRecord.emailVerified,
@@ -34,11 +38,16 @@ exports.getPostById = functions.https.onCall(async (data) => {
                 phone: userRecord.phoneNumber,
                 photoURL: userRecord.photoURL,
                 disabled: userRecord.disabled,
-                id: data.userId,
+                id: postData.userId,
             },
         };
     } catch (error) {
         console.error(error);
-        throw new functions.https.HttpsError('internal', error.message);
+
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        } else {
+            throw new functions.https.HttpsError('internal', 'An error occurred while fetching the post.', error.message);
+        }
     }
 });

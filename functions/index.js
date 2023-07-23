@@ -1,6 +1,5 @@
 const admin = require('firebase-admin');
 
-const { editProfile } = require('./user/editProfile');
 const { getUserById } = require('./user/getUserById');
 const { registerUser } = require('./user/registerUser');
 const { blockPost } = require('./posts/blockPost');
@@ -14,7 +13,6 @@ const { purchasePost } = require('./posts/purchasePost');
 const { createChat } = require('./chat/createChat');
 const { getChatById } = require('./chat/getChatById');
 const { getChats } = require('./chat/getChats');
-const { markChatAsRead } = require('./chat/markChatAsRead');
 const { sendMessage } = require('./chat/sendMessage');
 const { addRating } = require('./rating/addRating');
 
@@ -22,7 +20,6 @@ const { addRating } = require('./rating/addRating');
 admin.initializeApp();
 
 
-exports.editProfile = editProfile;
 exports.getUserById = getUserById;
 exports.registerUser = registerUser;
 
@@ -38,7 +35,6 @@ exports.purchasePost = purchasePost;
 exports.createChat = createChat;
 exports.getChatById = getChatById;
 exports.getChats = getChats;
-exports.markChatAsRead = markChatAsRead;
 exports.sendMessage = sendMessage;
 
 exports.addRating = addRating;

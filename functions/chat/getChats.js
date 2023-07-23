@@ -1,15 +1,14 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-
 exports.getChats = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve chats.');
-    }
-
-    const userId = context.auth.uid;
-
     try {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve chats.');
+        }
+
+        const userId = context.auth.uid;
+
         const userDoc = await admin.firestore().collection('users')
             .doc(userId)
             .get();
@@ -35,7 +34,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             const messages = messagesSnapshot.docs.map(doc => doc.data());
             messages.sort((a, b) => b.timestamp - a.timestamp);
             const lastMessage = messages.length > 0 ? messages[0] : null;
-            let lastMessageTimestamp = 0;
+            const lastMessageTimestamp = lastMessage ? lastMessage.timestamp : 0;
             const isOurs = lastMessage ? lastMessage.senderId === userId : false;
             const totalMessages = messages.filter(message => !message.isRead && (message.senderId !== userId)).length;
             const postId = chatData.postId || '';
@@ -43,10 +42,6 @@ exports.getChats = functions.https.onCall(async (data, context) => {
 
             let postPhoto = '';
             let postTitle = '';
-
-            if (lastMessage != null) {
-                lastMessageTimestamp = lastMessage.timestamp;
-            }
 
             if (postId) {
                 const postDoc = await admin.firestore().collection('posts')
@@ -74,7 +69,7 @@ exports.getChats = functions.https.onCall(async (data, context) => {
                 lastMessageTimestamp,
                 isOurs,
                 totalMessages,
-                postPhoto: postPhoto,
+                postPhoto,
                 postTitle,
                 participant: {
                     id: participantId,
@@ -91,6 +86,11 @@ exports.getChats = functions.https.onCall(async (data, context) => {
         return chats;
     } catch (error) {
         console.error(error);
-        throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        } else {
+            throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+        }
     }
 });

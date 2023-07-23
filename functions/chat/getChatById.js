@@ -1,16 +1,20 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-
 exports.getChatById = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve a chat.');
-    }
-
-    const { chatId } = data;
-    const userId = context.auth.uid;
-
     try {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to retrieve a chat.');
+        }
+
+        const { chatId } = data;
+
+        if (!chatId) {
+            throw new functions.https.HttpsError('invalid-argument', 'Chat ID is required.');
+        }
+
+        const userId = context.auth.uid;
+
         const chatDoc = await admin.firestore().collection('chats')
             .doc(chatId)
             .get();
@@ -74,6 +78,11 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
         };
     } catch (error) {
         console.error(error);
-        throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        } else {
+            throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+        }
     }
 });

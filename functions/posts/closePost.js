@@ -1,15 +1,18 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-
 exports.closePost = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to close a post.');
-    }
-
-    const postId = data.postId;
-
     try {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to close a post.');
+        }
+
+        const { postId } = data;
+
+        if (!postId) {
+            throw new functions.https.HttpsError('invalid-argument', 'Post ID is required and must be a string.');
+        }
+
         const postRef = admin.firestore().collection('posts').doc(postId);
 
         await postRef.update({
@@ -18,6 +21,12 @@ exports.closePost = functions.https.onCall(async (data, context) => {
 
         return { message: 'Post closed successfully.' };
     } catch (error) {
-        throw new functions.https.HttpsError('internal', 'An error occurred while closing the post.', error.message);
+        console.error(error);
+
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        } else {
+            throw new functions.https.HttpsError('internal', 'An error occurred while closing the post.', error.message);
+        }
     }
 });
