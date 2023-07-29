@@ -20,6 +20,10 @@ exports.getChats = functions.https.onCall(async (data, context) => {
         const userData = userDoc.data();
         const activeChats = userData.activeChats || [];
 
+        if (activeChats.length === 0) {
+            return []; 
+        }
+        
         const querySnapshot = await admin.firestore().collection('chats')
             .where(admin.firestore.FieldPath.documentId(), 'in', activeChats)
             .get();

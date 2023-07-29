@@ -14,7 +14,13 @@ exports.closePost = functions.https.onCall(async (data, context) => {
         }
 
         const postRef = admin.firestore().collection('posts').doc(postId);
-
+        const doc = await postRef.get();
+        let postData = doc.data();
+        
+        if (postData.userId != context.auth.uid) {
+            return 'Cannot close post that are not your own';
+        }
+        
         await postRef.update({
             status: 'Closed'
         });
