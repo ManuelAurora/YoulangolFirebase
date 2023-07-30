@@ -21,6 +21,18 @@ exports.getChatUsersForClosedPost = functions.https.onCall(async (data, context)
             throw new functions.https.HttpsError('not-found', 'User not found.');
         }
 
+        const postDoc = await admin.firestore().collection('posts').doc(postId).get();
+
+        if (!postDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Post not found.');
+        }
+
+        const postData = postDoc.data();
+
+        if (postData.userId !== currentUserID) {
+            throw new functions.https.HttpsError('permission-denied', 'You are not authorized to close posts that do not belong to you.');
+        }
+
         const userData = userDoc.data();
 
         const activeChats = userData.activeChats || [];
@@ -47,6 +59,7 @@ exports.getChatUsersForClosedPost = functions.https.onCall(async (data, context)
                 userId,
                 userName: userRecord.displayName,
                 userPhoto: userRecord.photoURL,
+                postTitle: postData.title,
             };
         });
 
