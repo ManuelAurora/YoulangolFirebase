@@ -20,7 +20,7 @@ exports.getPostById = functions.https.onCall(async (data) => {
         const postData = doc.data();
         const userRecord = await admin.auth().getUser(postData.userId);
         const creationTime = userRecord.metadata.creationTime;
-        const user = await admin.firestore.collection('users').doc(postData.userId).get().data();
+        const user = await admin.firestore().collection('users').doc(postData.userId).get().data();
 
         if (postData.locationRef) {
             const locationDoc = await postData.locationRef.get();
