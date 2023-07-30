@@ -10,6 +10,7 @@ const { getPostById } = require('./posts/getPostById');
 const { getPosts } = require('./posts/getPosts');
 const { getPostsByUser } = require('./posts/getPostsByUser');
 const { purchasePost } = require('./posts/purchasePost');
+const { getChatUsersForClosedPost } = require('./posts/getChatUsersForClosedPost');
 const { createChat } = require('./chat/createChat');
 const { getChatById } = require('./chat/getChatById');
 const { getChats } = require('./chat/getChats');
@@ -31,6 +32,7 @@ exports.getPostById = getPostById;
 exports.getPosts = getPosts;
 exports.getPostsByUser = getPostsByUser;
 exports.purchasePost = purchasePost;
+exports.getChatUsersForClosedPost = getChatUsersForClosedPost;
 
 exports.createChat = createChat;
 exports.getChatById = getChatById;

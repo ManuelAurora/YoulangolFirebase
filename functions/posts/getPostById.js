@@ -20,7 +20,13 @@ exports.getPostById = functions.https.onCall(async (data) => {
         const postData = doc.data();
         const userRecord = await admin.auth().getUser(postData.userId);
         const creationTime = userRecord.metadata.creationTime;
-        const user = await admin.firestore().collection('users').doc(postData.userId).get().data();
+        const user = await admin.firestore().collection('users').doc(postData.userId).get();
+
+        if (!user.exists) {
+            throw new functions.https.HttpsError('not-found', 'User not found.');
+        }
+
+        const { rating } = user.data();
 
         if (postData.locationRef) {
             const locationDoc = await postData.locationRef.get();
@@ -40,7 +46,7 @@ exports.getPostById = functions.https.onCall(async (data) => {
                 photoURL: userRecord.photoURL,
                 disabled: userRecord.disabled,
                 id: postData.userId,
-                rating: user.rating
+                rating,
             },
         };
     } catch (error) {
