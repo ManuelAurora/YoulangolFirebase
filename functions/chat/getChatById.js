@@ -32,6 +32,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
         let participantName = '';
         let participantPhoto = '';
         let postPrice = 0;
+        let buyerId = '';
 
         if (postId) {
             const postDoc = await admin.firestore().collection('posts')
@@ -48,6 +49,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
 
                 postTitle = postData.title || '';
                 postPrice = postData.price || 0;
+                buyerId = postData.buyerId;
             }
         }
 
@@ -65,6 +67,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
             postTitle,
             postPrice,
             postId,
+            buyerId: buyerId,
             participant: {
                 id: participantId,
                 name: participantName,

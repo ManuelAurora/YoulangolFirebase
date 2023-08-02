@@ -7,22 +7,23 @@ exports.closePost = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to close a post.');
         }
 
-        const { postId } = data;
+        const { postId, buyerId } = data;
 
         if (!postId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Post ID is required and must be a string.');
+            throw new functions.https.HttpsError('invalid-argument', 'Post ID are required and must be strings.');
         }
 
         const postRef = admin.firestore().collection('posts').doc(postId);
         const doc = await postRef.get();
         let postData = doc.data();
-        
+
         if (postData.userId != context.auth.uid) {
             return 'Cannot close post that are not your own';
         }
-        
+
         await postRef.update({
-            status: 'Closed'
+            status: 'Closed',
+            buyerId: buyerId
         });
 
         return { message: 'Post closed successfully.' };
