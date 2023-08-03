@@ -1,6 +1,20 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
+/**
+ * Получение первой картинки из массива изображений.
+ *
+ * @param {Array} images - Массив изображений. Должен быть массивом.
+ * @returns {String} - Первая картинка из массива или '', если массив пустой или не существует.
+ */
+function getFirstImage(images) {
+    if (!Array.isArray(images)) {
+        return '';
+    }
+
+    return images[0] || '';
+}
+
 exports.getChatById = functions.https.onCall(async (data, context) => {
     try {
         if (!context.auth) {
@@ -13,8 +27,6 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('invalid-argument', 'Chat ID is required.');
         }
 
-        const userId = context.auth.uid;
-
         const chatDoc = await admin.firestore().collection('chats')
             .doc(chatId)
             .get();
@@ -24,59 +36,50 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
         }
 
         const chatData = chatDoc.data();
-        const postId = chatData.postId || '';
-        const participantId = chatData.participants.find(id => id !== userId);
+        const currentUserId = context.auth.uid;
 
-        let postPhoto = '';
-        let postTitle = '';
-        let participantName = '';
-        let participantPhoto = '';
-        let postPrice = 0;
-        let buyerId = '';
+        const isCurrentUserChat = chatData.participants.includes(currentUserId)
 
-        if (postId) {
-            const postDoc = await admin.firestore().collection('posts')
-                .doc(postId)
-                .get();
-
-            if (postDoc.exists) {
-                const postData = postDoc.data();
-                const images = postData.images || [];
-
-                if (images.length > 0) {
-                    postPhoto = images[0];
-                }
-
-                postTitle = postData.title || '';
-                postPrice = postData.price || 0;
-                buyerId = postData.buyerId;
-            }
+        if (!isCurrentUserChat) {
+            throw new functions.https.HttpsError('permission-denied', 'You do not have permission to read this chat');
         }
 
-        const [userSnapshot, participantSnapshot] = await Promise.all([
-            admin.auth().getUser(userId),
-            admin.auth().getUser(participantId),
+        const postId = chatData.postId;
+        const participantId = chatData.participants.find(id => id !== currentUserId);
+
+        const [postDoc, participantSnapshot] = await Promise.all([
+            await admin.firestore().collection('posts').doc(postId).get(),
+            await admin.auth().getUser(participantId)
         ]);
 
-        participantName = participantSnapshot.displayName || '';
-        participantPhoto = participantSnapshot.photoURL || '';
+        if (!postDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Post not found.');
+        }
+
+        const postData = postDoc.data();
+
+        if (postData.locationRef) {
+            const locationDoc = await postData.locationRef.get();
+
+            postData.location = locationDoc.data();
+        }
 
         return {
-            chatData,
-            postPhoto: postPhoto,
-            postTitle,
-            postPrice,
-            postId,
-            buyerId: buyerId,
+            post: {
+                id: postId,
+                categoryId: postData.categoryId,
+                location: postData.location,
+                image: getFirstImage(postData.images),
+                title: postData.title,
+                price: postData.price,
+                status: postData.status,
+                buyerId: postData.buyerId,
+            },
+
             participant: {
                 id: participantId,
-                name: participantName,
-                photoUrl: participantPhoto,
-            },
-            currentUser: {
-                id: userId,
-                name: userSnapshot.displayName || '',
-                photoUrl: userSnapshot.photoURL || '',
+                name: participantSnapshot.displayName,
+                photoUrl: participantSnapshot.photoURL,
             },
         };
     } catch (error) {
