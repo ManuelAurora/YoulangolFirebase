@@ -9,7 +9,10 @@ exports.registerUser = functions.https.onCall(async (data) => {
             throw new functions.https.HttpsError('invalid-argument', 'UID is required in the request.');
         }
 
-        await admin.firestore().collection('users').doc(uid).set({ rating: 0 });
+        await admin.firestore().collection('users').doc(uid).set({
+            rating: 0,
+            activeChats: []
+        });
 
         return {
             success: true,

@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { getFirstImage } = require('../utils.js');
 
 exports.getChats = functions.https.onCall(async (data, context) => {
     try {
@@ -17,77 +18,79 @@ exports.getChats = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('not-found', 'User not found.');
         }
 
-        const userData = userDoc.data();
-        const activeChats = userData.activeChats || [];
+        const { activeChats } = userDoc.data();
 
-        if (activeChats.length === 0) {
-            return []; 
+        const hasActiveChats = Array.isArray(activeChats) && activeChats.length;
+
+        if (!hasActiveChats) {
+            return [];
         }
-        
+
         const querySnapshot = await admin.firestore().collection('chats')
-            .where(admin.firestore.FieldPath.documentId(), 'in', activeChats)
+            .where('__name__', 'in', activeChats)
             .get();
 
-        const chats = [];
+        const chatPromises = querySnapshot.docs.map(async (chat) => {
+            const chatData = chat.data();
 
-        const chatPromises = querySnapshot.docs.map(async (doc) => {
-            const chatData = doc.data();
-            const chatId = doc.id;
-            const messagesRef = admin.firestore().collection('chats').doc(chatId).collection('messages');
-            const messagesSnapshot = await messagesRef.get();
-            const messages = messagesSnapshot.docs.map(doc => doc.data());
-            messages.sort((a, b) => b.timestamp - a.timestamp);
-            const lastMessage = messages.length > 0 ? messages[0] : null;
-            const lastMessageTimestamp = lastMessage ? lastMessage.timestamp : 0;
-            const isOurs = lastMessage ? lastMessage.senderId === userId : false;
-            const totalMessages = messages.filter(message => !message.isRead && (message.senderId !== userId)).length;
-            const postId = chatData.postId || '';
+            const chatId = chat.id;
+            const postId = chatData.postId;
             const participantId = chatData.participants.find(id => id !== userId);
 
+            const [
+                messagesSnapshot,
+                postDoc,
+                participantUser
+            ] = await Promise.all([
+                await admin.firestore().collection('chats').doc(chatId).collection('messages').get(),
+                await admin.firestore().collection('posts').doc(postId).get(),
+                await admin.auth().getUser(participantId)
+            ]);
+
+            let lastMessage = null;
+            let unreadCount = 0;
             let postPhoto = '';
             let postTitle = '';
 
-            if (postId) {
-                const postDoc = await admin.firestore().collection('posts')
-                    .doc(postId)
-                    .get();
+            if (!messagesSnapshot.empty) {
+                const messages = messagesSnapshot.docs.map(doc => doc.data());
 
-                if (postDoc.exists) {
-                    const postData = postDoc.data();
-                    const images = postData.images || [];
+                if (Array.isArray(messages) && messages.length) {
+                    messages.sort((a, b) => b.timestamp - a.timestamp);
 
-                    if (images.length > 0) {
-                        postPhoto = images[0];
-                    }
-                    postTitle = postData.title;
+                    lastMessage = messages[0];
+                    unreadCount = messages.filter(({ isRead, senderId }) => (!isRead && (senderId !== userId))).length;
                 }
             }
 
-            const participantUser = await admin.auth().getUser(participantId);
-            const participantName = participantUser.displayName || '';
-            const participantPhoto = participantUser.photoURL || '';
+            if (postDoc.exists) {
+                const postData = postDoc.data();
+
+                postPhoto = getFirstImage(postData.images)
+                postTitle = postData.title;
+            }
 
             return {
                 chatId,
+                unreadCount,
+
                 lastMessage,
-                lastMessageTimestamp,
-                isOurs,
-                totalMessages,
-                postPhoto,
-                postTitle,
+
+                post: {
+                    id: postId,
+                    image: postPhoto,
+                    title: postTitle,
+                },
+
                 participant: {
                     id: participantId,
-                    name: participantName,
-                    photoUrl: participantPhoto,
+                    name: participantUser.displayName,
+                    photoUrl: participantUser.photoURL,
                 }
             };
         });
 
-        const chatResults = await Promise.all(chatPromises);
-
-        chats.push(...chatResults);
-
-        return chats;
+        return await Promise.all(chatPromises);
     } catch (error) {
         console.error(error);
 

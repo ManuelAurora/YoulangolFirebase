@@ -1,19 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-
-/**
- * Получение первой картинки из массива изображений.
- *
- * @param {Array} images - Массив изображений. Должен быть массивом.
- * @returns {String} - Первая картинка из массива или '', если массив пустой или не существует.
- */
-function getFirstImage(images) {
-    if (!Array.isArray(images)) {
-        return '';
-    }
-
-    return images[0] || '';
-}
+const { getFirstImage } = require('../utils.js');
 
 exports.getChatById = functions.https.onCall(async (data, context) => {
     try {
