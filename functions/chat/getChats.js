@@ -86,11 +86,15 @@ exports.getChats = functions.https.onCall(async (data, context) => {
                     id: participantId,
                     name: participantUser.displayName,
                     photoUrl: participantUser.photoURL,
-                }
+                },
+
+                updatedAt: chatData.updatedAt,
             };
         });
 
-        return await Promise.all(chatPromises);
+        const chats =  await Promise.all(chatPromises)
+
+        return chats.sort((a, b) => b.updatedAt - a.updatedAt);
     } catch (error) {
         console.error(error);
 
