@@ -19,7 +19,7 @@ exports.getUserById = functions.https.onCall(async (data) => {
 
         return {
             id: userId,
-            dateCreated: userRecord.metadata.creationTime,
+            creationTime: userRecord.metadata.creationTime,
             emailVerified: userRecord.emailVerified,
             name: userRecord.displayName,
             email: userRecord.email,

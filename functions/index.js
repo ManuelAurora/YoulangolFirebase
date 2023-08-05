@@ -16,6 +16,9 @@ const { getChatById } = require('./chat/getChatById');
 const { getChats } = require('./chat/getChats');
 const { sendMessage } = require('./chat/sendMessage');
 const { addRating } = require('./rating/addRating');
+const { addPostToFavorite } = require('./favorite/addPostToFavorite');
+const { removePostFromFavorite } = require('./favorite/removePostFromFavorite');
+const { getFavoritePosts } = require('./favorite/getFavoritePosts');
 
 
 admin.initializeApp();
@@ -40,3 +43,7 @@ exports.getChats = getChats;
 exports.sendMessage = sendMessage;
 
 exports.addRating = addRating;
+
+exports.addPostToFavorite = addPostToFavorite;
+exports.removePostFromFavorite = removePostFromFavorite;
+exports.getFavoritePosts = getFavoritePosts;

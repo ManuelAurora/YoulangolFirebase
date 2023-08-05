@@ -19,7 +19,6 @@ exports.getPostById = functions.https.onCall(async (data) => {
 
         const postData = doc.data();
         const userRecord = await admin.auth().getUser(postData.userId);
-        const creationTime = userRecord.metadata.creationTime;
         const user = await admin.firestore().collection('users').doc(postData.userId).get();
 
         if (!user.exists) {
@@ -38,7 +37,7 @@ exports.getPostById = functions.https.onCall(async (data) => {
         return {
             data: postData,
             user: {
-                creationTime,
+                creationTime: userRecord.metadata.creationTime,
                 emailVerified: userRecord.emailVerified,
                 name: userRecord.displayName,
                 email: userRecord.email,

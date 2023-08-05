@@ -17,7 +17,7 @@ exports.closePost = functions.https.onCall(async (data, context) => {
         const doc = await postRef.get();
         let postData = doc.data();
 
-        if (postData.userId != context.auth.uid) {
+        if (postData.userId !== context.auth.uid) {
             return 'Cannot close post that are not your own';
         }
 
