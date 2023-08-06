@@ -39,10 +39,13 @@ exports.getChatUsersForClosedPost = functions.https.onCall(async (data, context)
 
         const chatPromises = activeChats.map(async (chatId) => {
             const chatDoc = await admin.firestore().collection('chats').doc(chatId).get();
-            const chatData = chatDoc.data();
 
-            if (chatData.postId === postId) {
-                return chatData.participants.find(id => id !== currentUserID);
+            if (chatDoc.exists) {
+                const chatData = chatDoc.data();
+
+                if (chatData.postId === postId) {
+                    return chatData.participants.find(id => id !== currentUserID);
+                }
             }
 
             return null;
@@ -59,6 +62,7 @@ exports.getChatUsersForClosedPost = functions.https.onCall(async (data, context)
                 userId,
                 userName: userRecord.displayName,
                 userPhoto: userRecord.photoURL,
+                postId,
                 postTitle: postData.title,
             };
         });
