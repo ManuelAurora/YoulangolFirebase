@@ -17,11 +17,16 @@ exports.getReviews = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('not-found', 'User not found.');
         }
 
+        const { rating} = userDoc.data();
+
         const ratingCollectionRef = userRef.collection('rating');
         const ratingCollectionSnapshot = await ratingCollectionRef.get();
 
         if (ratingCollectionSnapshot.empty) {
-            return { success: true, reviews: [] };
+            return {
+                rating,
+                reviews: []
+            };
         }
 
         const reviewsSnapshot = await ratingCollectionRef.get();
@@ -30,7 +35,10 @@ exports.getReviews = functions.https.onCall(async (data, context) => {
             ...doc.data()
         }));
 
-        return { success: true, reviews };
+        return {
+            rating,
+            reviews
+        };
     } catch (error) {
         console.error(error);
 
