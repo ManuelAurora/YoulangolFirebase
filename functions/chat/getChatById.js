@@ -60,6 +60,7 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
                 title: postData.title,
                 price: postData.price,
                 status: postData.status,
+                isReviewed: postData.isReviewed,
                 buyerId: postData.buyerId,
             },
 
