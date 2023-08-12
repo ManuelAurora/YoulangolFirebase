@@ -7,18 +7,24 @@ exports.closePost = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to close a post.');
         }
 
-        const { postId, buyerId } = data;
+        const { postId, buyerId = null } = data;
 
         if (!postId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Post ID are required and must be strings.');
+            throw new functions.https.HttpsError('invalid-argument', 'postId are required and must be strings.');
         }
 
         const postRef = admin.firestore().collection('posts').doc(postId);
+
         const doc = await postRef.get();
-        let postData = doc.data();
+
+        if (!doc.exists) {
+            throw new functions.https.HttpsError('not-found', 'Post not found.');
+        }
+
+        const postData = doc.data();
 
         if (postData.userId !== context.auth.uid) {
-            return 'Cannot close post that are not your own';
+            throw new functions.https.HttpsError('permission-denied', 'You do not have permission to close this post');
         }
 
         await postRef.update({
@@ -26,7 +32,23 @@ exports.closePost = functions.https.onCall(async (data, context) => {
             buyerId: buyerId
         });
 
-        return { message: 'Post closed successfully.' };
+        if (postData.locationRef) {
+            const locationDoc = await postData.locationRef.get();
+
+            postData.location = locationDoc.data();
+        }
+
+        return {
+            message: 'Post closed successfully.',
+            post: {
+                id: postId,
+                categoryId: postData.categoryId,
+                location: postData.location,
+                title: postData.title,
+                images: postData.images,
+                price: postData.price,
+            }
+        };
     } catch (error) {
         console.error(error);
 
