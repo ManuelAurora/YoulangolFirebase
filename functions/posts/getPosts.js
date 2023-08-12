@@ -78,15 +78,25 @@ exports.getPosts = functions.https.onCall(async (data) => {
 
     try {
         snapshot = await query.get();
+
         const posts = await Promise.all(snapshot.docs.map(async (doc) => {
             const postData = doc.data();
+
             if (postData.locationRef) {
                 const locationId = await postData.locationRef.get();
-                const locationData = locationId.data();
-                postData.location = locationData;
-                postData.locationRef = null;
+
+                postData.location = locationId.data();
             }
-            return { id: doc.id, ...postData };
+
+            return {
+                id: doc.id,
+                categoryId: postData.categoryId,
+                title: postData.title,
+                price: postData.price,
+                userId: postData.userId,
+                images: postData.images,
+                location: postData.location,
+            };
         }));
 
         if (city) {
