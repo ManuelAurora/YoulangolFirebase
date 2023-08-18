@@ -13,6 +13,12 @@ exports.createPost = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('invalid-argument', 'Missing required fields.');
         }
 
+        const parsedPrice = parseInt(price, 10);
+
+        if (isNaN(parsedPrice)) {
+            throw new functions.https.HttpsError('invalid-argument', 'Price must be a valid number.');
+        }
+
         const userId = context.auth.uid;
 
         const newLocationRef = await admin.firestore().collection('locations').add(location);
@@ -61,7 +67,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
             status: 'Open',
             title,
             description,
-            price,
+            price: parsedPrice,
             categoryId,
             locationRef: newLocationRef,
             images: uploadedImages,
