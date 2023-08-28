@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { POST_STATUSES } = require('../constants.js');
 
 exports.blockPost = functions.https.onCall(async (data, context) => {
     try {
@@ -16,7 +17,7 @@ exports.blockPost = functions.https.onCall(async (data, context) => {
         const postRef = admin.firestore().collection('posts').doc(postId);
 
         await postRef.update({
-            status: 'Blocked'
+            status: POST_STATUSES.BLOCKED,
         });
 
         return { message: 'Post blocked successfully.' };

@@ -9,7 +9,7 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
 
         const { text, chatId } = data;
         const senderId = context.auth.uid;
-        const timestamp = admin.firestore.Timestamp.now().toMillis();
+        const timestamp = Date.now();
 
         if (!text || typeof text !== 'string') {
             throw new functions.https.HttpsError('invalid-argument', 'Text message is required and must be a string.');

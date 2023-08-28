@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { POST_STATUSES } = require('../constants.js');
 
 exports.closePost = functions.https.onCall(async (data, context) => {
     try {
@@ -28,7 +29,7 @@ exports.closePost = functions.https.onCall(async (data, context) => {
         }
 
         await postRef.update({
-            status: 'Closed',
+            status: POST_STATUSES.CLOSED,
             buyerId: buyerId
         });
 

@@ -71,7 +71,7 @@ exports.editPost = functions.https.onCall(async (data, context) => {
             categoryId: categoryId || post.categoryId,
             locationRef,
             images: imageUrls,
-            updatedAt: admin.firestore.Timestamp.now().toMillis(),
+            updatedAt: Date.now(),
         };
 
         await postRef.update(postData);

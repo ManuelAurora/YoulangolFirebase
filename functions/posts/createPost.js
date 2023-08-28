@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { POST_STATUSES } = require('../constants.js');
 
 exports.createPost = functions.https.onCall(async (data, context) => {
     try {
@@ -64,7 +65,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
         );
 
         const newPost = {
-            status: 'Open',
+            status: POST_STATUSES.OPEN,
             title,
             description,
             price: parsedPrice,
@@ -72,7 +73,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
             locationRef: newLocationRef,
             images: uploadedImages,
             userId,
-            createdAt: admin.firestore.Timestamp.now().toMillis(),
+            createdAt: Date.now(),
         };
 
         await newPostDocRef.set(newPost);
