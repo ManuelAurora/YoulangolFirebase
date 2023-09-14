@@ -90,9 +90,10 @@ exports.searchPosts = functions.https.onCall(
             // }
 
             // [работает, но только с учетом регистра] Apply search query
+            
             if (search) {
-                // @todo: нужно придумать как искать
-                query = query.where('title', '>=', search).where('title', '<=', `${search}\uF8FF`);
+                const searchLower = search.toLowerCase();
+                query = query.where('searchBy', '>=', searchLower).where('searchBy', '<=', `${searchLower}\uF8FF`);
             }
 
             // Apply pagination using cursor

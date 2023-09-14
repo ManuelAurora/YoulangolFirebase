@@ -71,6 +71,7 @@ exports.editPost = functions.https.onCall(async (data, context) => {
             categoryId: categoryId || post.categoryId,
             locationRef,
             images: imageUrls,
+            searchBy: title.lowerCase(),
             updatedAt: Date.now(),
         };
 
