@@ -2,6 +2,7 @@ const admin = require('firebase-admin');
 
 const { getUserById } = require('./user/getUserById');
 const { registerUser } = require('./user/registerUser');
+const { updateUser } = require('./user/updateUser');
 const { blockPost } = require('./posts/blockPost');
 const { closePost } = require('./posts/closePost');
 const { createPost } = require('./posts/createPost');
@@ -28,6 +29,7 @@ admin.initializeApp();
 
 exports.getUserById = getUserById;
 exports.registerUser = registerUser;
+exports.updateUser = updateUser;
 
 exports.blockPost = blockPost;
 exports.closePost = closePost;

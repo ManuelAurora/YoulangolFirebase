@@ -95,6 +95,7 @@ exports.getPosts = functions.https.onCall(async (data) => {
                 price: postData.price,
                 userId: postData.userId,
                 images: postData.images,
+                status: postData.status,
                 location: postData.location,
             };
         }));
