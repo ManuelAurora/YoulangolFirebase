@@ -9,14 +9,31 @@ exports.registerUser = functions.https.onCall(async (data) => {
             throw new functions.https.HttpsError('invalid-argument', 'UID is required in the request.');
         }
 
-        await admin.firestore().collection('users').doc(uid).set({
+        const userDocRef = admin.firestore().collection('users').doc(uid);
+        await userDocRef.set({
             rating: 0,
             activeChats: []
         });
 
+        const [userRecord, userDoc] = await Promise.all([
+            admin.auth().getUser(uid),
+            userDocRef.get()
+        ]);
+
+        if (!userDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'User not found.');
+        }
+
         return {
-            success: true,
-            message: 'User registered successfully. Please check your email to verify your account.',
+            id: userRecord.uid,
+            creationTime: userRecord.metadata.creationTime,
+            emailVerified: userRecord.emailVerified,
+            name: userRecord.displayName,
+            email: userRecord.email,
+            phone: userRecord.phoneNumber,
+            photoURL: userRecord.photoURL,
+            disabled: userRecord.disabled,
+            ...userDoc.data()
         };
     } catch (error) {
         console.error(error);
