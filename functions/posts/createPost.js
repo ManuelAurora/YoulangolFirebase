@@ -73,7 +73,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
             locationRef: newLocationRef,
             images: uploadedImages,
             userId,
-            searchBy: title.lowerCase(),
+            searchBy: title.toLowerCase(),
             createdAt: Date.now(),
         };
 
