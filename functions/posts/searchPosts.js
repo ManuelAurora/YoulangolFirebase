@@ -27,7 +27,9 @@ exports.searchPosts = functions.https.onCall(
     async (data) => {
         try {
             const {
-                attributes = [],
+                minPrice,
+                maxPrice,
+                safeTransaction,
                 datePublished,
                 location,
                 search,
@@ -35,20 +37,13 @@ exports.searchPosts = functions.https.onCall(
             } = data;
 
             let query = admin.firestore().collection('posts');
+            
+            if (minPrice) {
+                query = query.where('price', '>=', minPrice);
+            }
 
-            // [работает] Apply filters
-            if (attributes) {
-                const priceFilter = attributes.find(attribute => attribute.slug === 'price');
-
-                if (priceFilter) {
-                    if (priceFilter.from) {
-                        query = query.where('price', '>=', priceFilter.from);
-                    }
-
-                    if (priceFilter.to) {
-                        query = query.where('price', '<=', priceFilter.to);
-                    }
-                }
+            if (maxPrice) {
+                query = query.where('price', '<=', maxPrice);
             }
 
             // [работает] Apply date range filter
