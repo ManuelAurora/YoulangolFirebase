@@ -19,8 +19,7 @@ exports.getReviews = functions.https.onCall(async (data, context) => {
 
         const { rating} = userDoc.data();
 
-        const ratingCollectionRef = userRef.collection('rating');
-        const ratingCollectionSnapshot = await ratingCollectionRef.get();
+        const ratingCollectionSnapshot = await userRef.collection('rating').get();
 
         if (ratingCollectionSnapshot.empty) {
             return {
@@ -29,8 +28,7 @@ exports.getReviews = functions.https.onCall(async (data, context) => {
             };
         }
 
-        const reviewsSnapshot = await ratingCollectionRef.get();
-        const reviews = reviewsSnapshot.docs.map(doc => ({
+        const reviews = ratingCollectionSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
         }));
