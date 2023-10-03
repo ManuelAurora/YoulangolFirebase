@@ -7,8 +7,11 @@ exports.editPost = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to edit a post.');
         }
 
-        const { postId, title, description, price, categoryId, location, images, removedImages } = data;
         const userId = context.auth.uid;
+
+        const { postId, title, description, price, categoryId, location, images, removedImages } = data;
+
+        // @todo: validate location
 
         const postRef = admin.firestore().collection('posts').doc(postId);
         const postDoc = await postRef.get();
@@ -21,15 +24,6 @@ exports.editPost = functions.https.onCall(async (data, context) => {
 
         if (post.userId !== userId) {
             throw new functions.https.HttpsError('permission-denied', 'You do not have permission to edit this post');
-        }
-
-        // Update location
-        let locationRef = post.locationRef;
-
-        if (location) {
-            const locationDoc = await admin.firestore().collection('locations').doc(post.locationRef.id).get();
-            await locationDoc.ref.update(location);
-            locationRef = locationDoc.ref;
         }
 
         // Remove images
@@ -69,7 +63,7 @@ exports.editPost = functions.https.onCall(async (data, context) => {
             description: description || post.description,
             price: price || post.price,
             categoryId: categoryId || post.categoryId,
-            locationRef,
+            location,
             images: imageUrls,
             searchBy: title.toLowerCase(),
             updatedAt: Date.now(),

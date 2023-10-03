@@ -28,13 +28,6 @@ exports.getFavoritePosts = functions.https.onCall(async (data, context) => {
             if (postDoc.exists) {
                 const postData = postDoc.data();
 
-                if (postData.locationRef) {
-                    const locationId = await postData.locationRef.get();
-
-                    postData.location = locationId.data();
-                    postData.locationRef = null;
-                }
-
                 return {
                     id: postDoc.id,
                     ...postData

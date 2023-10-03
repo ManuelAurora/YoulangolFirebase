@@ -37,7 +37,7 @@ exports.searchPosts = functions.https.onCall(
             } = data;
 
             let query = admin.firestore().collection('posts');
-            
+
             if (minPrice) {
                 query = query.where('price', '>=', minPrice);
             }
@@ -85,7 +85,7 @@ exports.searchPosts = functions.https.onCall(
             // }
 
             // [работает, но только с учетом регистра] Apply search query
-            
+
             if (search) {
                 const searchLower = search.toLowerCase();
                 query = query.where('searchBy', '>=', searchLower).where('searchBy', '<=', `${searchLower}\uF8FF`);
@@ -101,12 +101,6 @@ exports.searchPosts = functions.https.onCall(
 
             return await Promise.all(snapshot.docs.map(async (doc) => {
                 const postData = doc.data();
-
-                if (postData.locationRef) {
-                    const locationId = await postData.locationRef.get();
-
-                    postData.location = locationId.data();
-                }
 
                 return {
                     id: doc.id,

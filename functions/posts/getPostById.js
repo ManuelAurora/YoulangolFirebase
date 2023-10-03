@@ -27,13 +27,6 @@ exports.getPostById = functions.https.onCall(async (data) => {
 
         const { rating } = user.data();
 
-        if (postData.locationRef) {
-            const locationDoc = await postData.locationRef.get();
-
-            postData.location = locationDoc.data();
-            postData.locationRef = null;
-        }
-
         return {
             data: postData,
             user: {

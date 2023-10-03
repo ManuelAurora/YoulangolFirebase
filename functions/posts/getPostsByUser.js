@@ -16,15 +16,10 @@ exports.getPostsByUser = functions.https.onCall(async (data) => {
         const snapshot = await query.get();
 
         return await Promise.all(snapshot.docs.map(async (doc) => {
-            const postData = doc.data();
-
-            if (postData.locationRef) {
-                const locationId = await postData.locationRef.get();
-                postData.location = locationId.data();
-                postData.locationRef = null;
-            }
-
-            return { id: doc.id, ...postData };
+            return {
+                id: doc.id,
+                ...doc.data()
+            };
         }));
 
     } catch (error) {

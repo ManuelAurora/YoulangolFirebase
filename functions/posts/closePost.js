@@ -33,12 +33,6 @@ exports.closePost = functions.https.onCall(async (data, context) => {
             buyerId: buyerId
         });
 
-        if (postData.locationRef) {
-            const locationDoc = await postData.locationRef.get();
-
-            postData.location = locationDoc.data();
-        }
-
         return {
             message: 'Post closed successfully.',
             post: {

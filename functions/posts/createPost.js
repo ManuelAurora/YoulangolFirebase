@@ -2,6 +2,49 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const { POST_STATUSES } = require('../constants.js');
 
+
+/**
+ * Проверяет и преобразует данные гео.
+ *
+ * @param {Object} location - Объект гео.
+ * @param {string} location.city - Название города.
+ * @param {string} location.displayName - Отображаемое название города.
+ * @param {string} location.lat - Широта в виде строки.
+ * @param {string} location.lon - Долгота в виде строки.
+ * @returns {Object} Объект с проверенными и преобразованными данными гео.
+ * @throws {functions.https.HttpsError} Если данные гео не прошли валидацию.
+ */
+function parseLocation(location) {
+    if (!location || typeof location !== 'object') {
+        throw new functions.https.HttpsError('invalid-argument', 'Location must be an object.');
+    }
+
+    const { city, displayName, lat, lon } = location;
+
+    if (typeof city !== 'string' || !city.trim()) {
+        throw new functions.https.HttpsError('invalid-argument', 'City must be a non-empty string.');
+    }
+
+    if (typeof displayName !== 'string' || !displayName.trim()) {
+        throw new functions.https.HttpsError('invalid-argument', 'Display Name must be a non-empty string.');
+    }
+
+    const parsedLat = parseFloat(lat);
+    const parsedLon = parseFloat(lon);
+
+    if (isNaN(parsedLat) || isNaN(parsedLon)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Latitude and Longitude must be valid numbers.');
+    }
+
+    return {
+        city: city.trim(),
+        displayName: displayName.trim(),
+        lat: parsedLat,
+        lon: parsedLon,
+    };
+}
+
+
 exports.createPost = functions.https.onCall(async (data, context) => {
     try {
         if (!context.auth) {
@@ -22,11 +65,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
 
         const userId = context.auth.uid;
 
-        const newLocationRef = await admin.firestore().collection('locations').add(location);
-
-        if (!newLocationRef.id) {
-            throw new functions.https.HttpsError('internal', 'An error occurred while saving the location.');
-        }
+        const locationData = parseLocation(location);
 
         const userFolder = `User_${userId}`;
 
@@ -70,7 +109,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
             description,
             price: parsedPrice,
             categoryId,
-            locationRef: newLocationRef,
+            location: locationData,
             images: uploadedImages,
             userId,
             searchBy: title.toLowerCase(),

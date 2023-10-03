@@ -82,12 +82,6 @@ exports.getPosts = functions.https.onCall(async (data) => {
         const posts = await Promise.all(snapshot.docs.map(async (doc) => {
             const postData = doc.data();
 
-            if (postData.locationRef) {
-                const locationId = await postData.locationRef.get();
-
-                postData.location = locationId.data();
-            }
-
             return {
                 id: doc.id,
                 categoryId: postData.categoryId,

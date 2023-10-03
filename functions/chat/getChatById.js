@@ -45,12 +45,6 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
 
         const postData = postDoc.data();
 
-        if (postData.locationRef) {
-            const locationDoc = await postData.locationRef.get();
-
-            postData.location = locationDoc.data();
-        }
-
         return {
             post: {
                 id: postId,
