@@ -1,117 +1,230 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-
 /**
- * Фильтрация списка постов по заданному радиусу от заданного местоположения.
+ * Вычисляет границы (bounding box) на основе координат и радиуса.
  *
- * @param {Array} posts - Массив постов, которые требуется отфильтровать.
- * @param {Object} location - Объект, содержащий координаты заданного местоположения в виде `{latitude, longitude}`.
- * @param {Number} radius - Радиус в километрах для фильтрации постов.
- * @returns {Array} - Отфильтрованный массив постов.
+ * @param {number} latitude - Широта в градусах.
+ * @param {number} longitude - Долгота в градусах.
+ * @param {number} [radius=50] - Радиус в километрах (по умолчанию 50).
+ * @returns {Object} - Объект с границами bounding box, или пустой объект, если координаты некорректные.
  */
-async function filterPostsByRadius(posts, location, radius) {
+function calculateBoundingBox(latitude, longitude, radius = 50) {
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+        return {}
+    }
+
     const EARTH_RADIUS = 6371;
+    const radianLatitude = (Math.PI / 180) * latitude;
+    const radianRadius = radius / EARTH_RADIUS;
+    const degreesPerRadian = 180 / Math.PI;
 
-    const { latitude, longitude } = location;
+    const degreesRadius = radianRadius * degreesPerRadian;
 
-    // @todo: Нужно либо указать значение по умолчанию для radius, либо выполнять логику ниже только когда есть radius
-    const filteredPosts = await Promise.all(
-        posts.map(async (post) => {
-            const { lat: postLat, lon: postLng } = post.location;
-            const dLat = toRad(postLat - latitude);
-            const dLng = toRad(postLng - longitude);
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(toRad(latitude)) * Math.cos(toRad(postLat)) *
-                Math.sin(dLng / 2) * Math.sin(dLng / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            const distance = EARTH_RADIUS * c;
-
-            if (distance <= radius) {
-                return post;
-            }
-        }),
-    );
-
-    return filteredPosts.filter(post => post);
+    return {
+        minLatitude: latitude - degreesRadius,
+        maxLatitude: latitude + degreesRadius,
+        minLongitude: longitude - (degreesRadius / Math.cos(radianLatitude)),
+        maxLongitude: longitude + (degreesRadius / Math.cos(radianLatitude))
+    };
 }
 
 /**
- * Преобразование градусы в радианы.
+ * Фильтрует массив объектов на основе заданных параметров поиска.
  *
- * @param {Number} degrees - Значение в градусах, которое требуется преобразовать в радианы.
- * @returns {Number} - Значение в радианах.
+ * @param {Object[]} posts - Массив объектов, которые необходимо отфильтровать.
+ * @param {{search: string}} searchParams - Параметры поиска.
+ * @param {number|undefined} searchParams.minLongitude - Минимальное значение долготы для фильтрации по геолокации.
+ * @param {number|undefined} searchParams.maxLongitude - Максимальное значение долготы для фильтрации по геолокации.
+ * @param {number|undefined} searchParams.minPrice - Минимальная цена для фильтрации по цене.
+ * @param {number|undefined} searchParams.maxPrice - Максимальная цена для фильтрации по цене.
+ * @param {Object} searchParams.datePublished - Параметры фильтрации по дате публикации.
+ * @param {number|undefined} searchParams.datePublished.from - Начальная дата публикации для фильтрации.
+ * @param {number|undefined} searchParams.datePublished.to - Конечная дата публикации для фильтрации.
+ * @param {string} searchParams.search - Подстрока для поиска в заголовках объектов.
+ * @returns {Object[]} - Массив объектов, соответствующих заданным параметрам поиска.
+ * @throws {Error} - Если переданы некорректные значения параметров поиска.
  */
-function toRad(degrees) {
-    return degrees * Math.PI / 180;
+function filterPosts(posts, searchParams) {
+    if (!Array.isArray(posts) || typeof searchParams !== 'object') {
+        throw new Error('Invalid input data.');
+    }
+
+    return posts.filter((post) => {
+        if (
+            (typeof searchParams.minLongitude === 'number' && typeof searchParams.maxLongitude === 'number') &&
+            !(post.location.lon >= searchParams.minLongitude && post.location.lon <= searchParams.maxLongitude)
+        ) {
+            return false;
+        }
+
+        if (
+            (typeof searchParams.minPrice === 'number' && post.price < searchParams.minPrice) ||
+            (typeof searchParams.maxPrice === 'number' && post.price > searchParams.maxPrice)
+        ) {
+            return false;
+        }
+
+        if (
+            searchParams.datePublished &&
+            (
+                (typeof searchParams.datePublished.from === 'number' && post.createdAt < searchParams.datePublished.from) ||
+                (typeof searchParams.datePublished.to === 'number' && post.createdAt > searchParams.datePublished.to)
+            )
+        ) {
+            return false;
+        }
+
+
+        if (typeof searchParams.search === 'string' && searchParams.search && !post.title.toLowerCase().includes(searchParams.search.toLowerCase())) {
+            return false;
+        }
+
+        return true;
+    });
 }
 
 
-exports.getPosts = functions.https.onCall(async (data) => {
-    const { page = 1, category, location, radius } = data;
-    const pageSize = 40;
-    const startAfter = (page - 1) * pageSize;
-    const city = location.city;
-    let query = admin.firestore().collection('posts');
+exports.getPosts = functions.https.onCall(
+    /**
+     * Функция для фильтрации и поиска постов
+     *
+     * @param {Object} data - Параметры для фильтрации и поиска
+     *
+     * @param {string} data.category - Название категории
+     *
+     * @param {Object} data.location - Информация о локации
+     * @param {number} data.location.latitude - Широта
+     * @param {number} data.location.longitude - Долгота
+     * @param {number|null} data.location.radius - Максимальный радиус поиска
+     *
+     * @param {number} data.minPrice - Минимальная цена
+     * @param {number} data.minPrice - Максимальная цена
+     *
+     * @param {Object} data.datePublished - Диапазон даты публикации
+     * @param {number|null} data.datePublished.to - Конечная дата публикации
+     * @param {number|null} data.datePublished.from - Начальная дата публикации
 
-    if (category && city) {
-        query = query.where('categoryId', '==', category);
-    } else if (category) {
-        query = query.where('categoryId', '==', category);
-    }
+     * @param {string|null} data.search - Поисковый запрос
 
-    query = query.orderBy('createdAt', 'desc');
+     * @param {string} [data.page=1] - Текущая страница
+     * @param {string|null} [data.limit=10] - Количество результатов на странице
+     * @returns {Array} - Отфильтрованный и отсортированный список постов
+     */
+    async (data) => {
+        try {
+            const {
+                category,
 
-    let snapshot;
+                location,
 
-    if (page < 0) {
-        return { success: false, message: 'Page cannot be below 0' };
-    } else if (location == null) {
-        return { success: false, message: 'You need to have location object' };
-    } else if (location.city == null) {
-        return { success: false, message: 'City should not be empty' };
-    } else if (location.city == null) {
-        return { success: false, message: 'City should not be empty' };
-    } else if (page == null) {
-        return { success: false, message: 'Page should not be empty' };
-    }
+                minPrice,
+                maxPrice,
 
-    try {
-        snapshot = await query.get();
+                datePublished,
 
-        const posts = await Promise.all(snapshot.docs.map(async (doc) => {
-            const postData = doc.data();
+                search = '',
+
+                page = 1,
+                limit = 10,
+            } = data;
+
+            const startAfter = (page - 1) * limit;
+
+            let query = admin.firestore().collection('posts')
+                .where('status', '==', 'open')
+
+            if (category) {
+                query = query.where('categoryId', '==', category)
+            }
+
+            if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+                const {
+                    minLatitude,
+                    maxLatitude,
+                    minLongitude,
+                    maxLongitude
+                } = calculateBoundingBox(location.latitude, location.longitude, location.radius);
+
+
+                query = query
+                    .where('location.lat', '>=', minLatitude)
+                    .where('location.lat', '<=', maxLatitude)
+
+                const snapshot = await query.get();
+                const searchResults = snapshot.docs.map(doc => doc.data());
+
+                const filteredPosts = filterPosts(searchResults, {
+                    minLongitude,
+                    maxLongitude,
+                    minPrice,
+                    maxPrice,
+                    datePublished,
+                    search
+                })
+
+                const resultsCount = filteredPosts.length;
+
+                return {
+                    posts: filteredPosts.slice(startAfter, startAfter + limit),
+                    resultsCount,
+                    page,
+                };
+            }
+
+            if (minPrice || maxPrice) {
+                if (minPrice) {
+                    query = query.where('price', '>=', minPrice);
+                }
+
+                if (maxPrice) {
+                    query = query.where('price', '<=', maxPrice);
+                }
+
+                const snapshot = await query.get();
+                const searchResults = snapshot.docs.map(doc => doc.data());
+
+                const filteredPosts = filterPosts(searchResults, { datePublished, search })
+
+                const resultsCount = filteredPosts.length;
+
+                return {
+                    posts: filteredPosts.slice(startAfter, startAfter + limit),
+                    resultsCount,
+                    page,
+                };
+            }
+
+            if (datePublished) {
+                if (datePublished.from) {
+                    query = query.where('createdAt', '>=', datePublished.from);
+                }
+
+                if (datePublished.to) {
+                    query = query.where('createdAt', '<=', datePublished.to);
+                }
+            }
+
+            const snapshot = await query.get();
+            const searchResults = snapshot.docs.map(doc => doc.data());
+
+            const filteredPosts = filterPosts(searchResults, { search })
+
+            const resultsCount = filteredPosts.length;
 
             return {
-                id: doc.id,
-                categoryId: postData.categoryId,
-                title: postData.title,
-                price: postData.price,
-                userId: postData.userId,
-                images: postData.images,
-                status: postData.status,
-                location: postData.location,
+                posts: filteredPosts.slice(startAfter, startAfter + limit),
+                resultsCount,
+                page,
             };
-        }));
+        } catch (error) {
+            console.error(error);
 
-        if (city) {
-            const filteredPosts = posts.filter(post => post.location && post.location.city === city);
-
-            if (radius) {
-                return filterPostsByRadius(filteredPosts, location, radius);
+            if (error instanceof functions.https.HttpsError) {
+                throw error;
+            } else {
+                throw new functions.https.HttpsError('internal', 'An error occurred while performing the search.', error.message);
             }
-
-            return filteredPosts;
         }
-
-        if (radius) {
-            return filterPostsByRadius(posts, location, radius);
-        }
-
-        return posts;
-    } catch (error) {
-        console.log(error);
-
-        return null;
-    }
-});
+    },
+);
