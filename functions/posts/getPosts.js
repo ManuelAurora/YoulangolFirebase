@@ -9,14 +9,14 @@ const admin = require('firebase-admin');
  * @param {number} [radius=50] - Радиус в километрах (по умолчанию 50).
  * @returns {Object} - Объект с границами bounding box, или пустой объект, если координаты некорректные.
  */
-function calculateBoundingBox(latitude, longitude, radius = 50) {
+function calculateBoundingBox(latitude, longitude, radius) {
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
         return {}
     }
 
     const EARTH_RADIUS = 6371;
     const radianLatitude = (Math.PI / 180) * latitude;
-    const radianRadius = radius / EARTH_RADIUS;
+    const radianRadius = (radius || 50) / EARTH_RADIUS;
     const degreesPerRadian = 180 / Math.PI;
 
     const degreesRadius = radianRadius * degreesPerRadian;
@@ -152,7 +152,11 @@ exports.getPosts = functions.https.onCall(
                     .where('location.lat', '<=', maxLatitude)
 
                 const snapshot = await query.get();
-                const searchResults = snapshot.docs.map(doc => doc.data());
+                const searchResults = snapshot.docs
+                    .map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
 
                 const filteredPosts = filterPosts(searchResults, {
                     minLongitude,
@@ -182,7 +186,11 @@ exports.getPosts = functions.https.onCall(
                 }
 
                 const snapshot = await query.get();
-                const searchResults = snapshot.docs.map(doc => doc.data());
+                const searchResults = snapshot.docs
+                    .map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
 
                 const filteredPosts = filterPosts(searchResults, { datePublished, search })
 
@@ -206,7 +214,11 @@ exports.getPosts = functions.https.onCall(
             }
 
             const snapshot = await query.get();
-            const searchResults = snapshot.docs.map(doc => doc.data());
+            const searchResults = snapshot.docs
+                .map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
 
             const filteredPosts = filterPosts(searchResults, { search })
 
