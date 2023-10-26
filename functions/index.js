@@ -21,7 +21,7 @@ const { getReviews } = require('./rating/getReviews');
 const { addPostToFavorite } = require('./favorite/addPostToFavorite');
 const { removePostFromFavorite } = require('./favorite/removePostFromFavorite');
 const { getFavoritePosts } = require('./favorite/getFavoritePosts');
-
+const { sendEmail } = require('./support/sendEmail');
 
 admin.initializeApp();
 
@@ -51,3 +51,5 @@ exports.getReviews = getReviews;
 exports.addPostToFavorite = addPostToFavorite;
 exports.removePostFromFavorite = removePostFromFavorite;
 exports.getFavoritePosts = getFavoritePosts;
+
+exports.sendEmail = sendEmail;
