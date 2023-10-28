@@ -30,14 +30,12 @@ exports.getPostById = functions.https.onCall(async (data) => {
         return {
             data: postData,
             user: {
+                id: postData.userId,
                 creationTime: userRecord.metadata.creationTime,
                 emailVerified: userRecord.emailVerified,
                 name: userRecord.displayName,
-                email: userRecord.email,
-                phone: userRecord.phoneNumber,
                 photoURL: userRecord.photoURL,
                 disabled: userRecord.disabled,
-                id: postData.userId,
                 rating,
             },
         };

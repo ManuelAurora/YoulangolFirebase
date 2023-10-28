@@ -1,8 +1,12 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-exports.getUserById = functions.https.onCall(async (data) => {
+exports.getPostUserData = functions.https.onCall(async (data, context) => {
     try {
+        if (!context.auth) {
+            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to get this profile.');
+        }
+
         const { userId } = data;
 
         if (!userId) {
@@ -15,16 +19,20 @@ exports.getUserById = functions.https.onCall(async (data) => {
             throw new functions.https.HttpsError('not-found', 'User not found.');
         }
 
+        const { rating } = userDoc.data();
+
         const userRecord = await admin.auth().getUser(userId);
 
         return {
             id: userId,
+            name: userRecord.displayName,
+            phone: userRecord.phoneNumber,
+            email: userRecord.email,
             creationTime: userRecord.metadata.creationTime,
             emailVerified: userRecord.emailVerified,
-            name: userRecord.displayName,
             photoURL: userRecord.photoURL,
             disabled: userRecord.disabled,
-            ...userDoc.data()
+            rating
         };
     } catch (error) {
         console.error(error);

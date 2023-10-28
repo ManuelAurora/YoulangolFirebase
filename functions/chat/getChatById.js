@@ -62,6 +62,8 @@ exports.getChatById = functions.https.onCall(async (data, context) => {
                 id: participantId,
                 name: participantSnapshot.displayName,
                 photoUrl: participantSnapshot.photoURL,
+                phone: participantSnapshot.phoneNumber,
+                email: participantSnapshot.email,
             },
         };
     } catch (error) {

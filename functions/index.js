@@ -1,8 +1,11 @@
 const admin = require('firebase-admin');
 
-const { getUserById } = require('./user/getUserById');
 const { registerUser } = require('./user/registerUser');
 const { updateUser } = require('./user/updateUser');
+const { getUser } = require('./user/getUser');
+
+const { getUserById } = require('./user/getUserById');
+
 const { blockPost } = require('./posts/blockPost');
 const { closePost } = require('./posts/closePost');
 const { createPost } = require('./posts/createPost');
@@ -12,6 +15,7 @@ const { getPosts } = require('./posts/getPosts');
 const { getPostsByUser } = require('./posts/getPostsByUser');
 const { purchasePost } = require('./posts/purchasePost');
 const { getChatUsersForClosedPost } = require('./posts/getChatUsersForClosedPost');
+const { getPostUserData } = require('./posts/getPostUserData');
 const { createChat } = require('./chat/createChat');
 const { getChatById } = require('./chat/getChatById');
 const { getChats } = require('./chat/getChats');
@@ -26,10 +30,13 @@ const { sendEmail } = require('./support/sendEmail');
 admin.initializeApp();
 
 
-exports.getUserById = getUserById;
 exports.registerUser = registerUser;
 exports.updateUser = updateUser;
+exports.getUser = getUser;
 
+exports.getUserById = getUserById;
+
+exports.purchasePost = purchasePost;
 exports.blockPost = blockPost;
 exports.closePost = closePost;
 exports.createPost = createPost;
@@ -37,8 +44,8 @@ exports.editPost = editPost;
 exports.getPostById = getPostById;
 exports.getPosts = getPosts;
 exports.getPostsByUser = getPostsByUser;
-exports.purchasePost = purchasePost;
 exports.getChatUsersForClosedPost = getChatUsersForClosedPost;
+exports.getPostUserData = getPostUserData;
 
 exports.createChat = createChat;
 exports.getChatById = getChatById;
