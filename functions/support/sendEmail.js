@@ -5,7 +5,9 @@ const supportEmail = process.env.SUPPORT_EMAIL;
 const supportPassword = process.env.SUPPORT_PASSWORD;
 
 const transporter = nodemailer.createTransport({
-    service: 'Gmail',
+    host: 'smtpout.secureserver.net',
+    secure: false,
+    port: 587,
     auth: {
         user: supportEmail,
         pass: supportPassword
@@ -21,15 +23,9 @@ exports.sendEmail = functions.https.onCall(async (data, context) => {
 
     const mailOptions = {
         from: supportEmail,
-        to: 'korotaev.e.s@inbox.ru',
+        to: supportEmail,
         subject: `[${email}]: ${subject}`,
-        text: `
-            subject: ${subject}
-            name: ${name}
-            email: ${email}
-            userId: ${userId}
-            text: ${text}
-        `
+        text: `name: ${name}\nemail: ${email}\nuserId: ${userId}\nsubject: ${subject}\ntext: ${text}`
     };
 
     try {
