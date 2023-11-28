@@ -3,7 +3,7 @@ const admin = require('firebase-admin');
 
 exports.getPostById = functions.https.onCall(async (data) => {
     try {
-        const postId = data.id;
+        const { postId } = data;
 
         if (!postId) {
             throw new functions.https.HttpsError('invalid-argument', 'Post ID is required.');
@@ -18,17 +18,20 @@ exports.getPostById = functions.https.onCall(async (data) => {
         }
 
         const postData = doc.data();
-        const userRecord = await admin.auth().getUser(postData.userId);
-        const user = await admin.firestore().collection('users').doc(postData.userId).get();
 
-        if (!user.exists) {
+        const [userRecord, userDoc] = await Promise.all([
+            admin.auth().getUser(postData.userId),
+            admin.firestore().collection('users').doc(postData.userId).get()
+        ]);
+
+        if (!userDoc.exists) {
             throw new functions.https.HttpsError('not-found', 'User not found.');
         }
 
-        const { rating } = user.data();
+        const { rating } = userDoc.data();
 
         return {
-            data: postData,
+            post: postData,
             user: {
                 id: postData.userId,
                 creationTime: userRecord.metadata.creationTime,
