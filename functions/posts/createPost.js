@@ -51,7 +51,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to create a post.');
         }
 
-        const { title, description, price, categoryId, location, images } = data;
+        const { title, description, price, categoryId, location, images, isSafeDeal = false } = data;
 
         if (!title || !description || !price || !categoryId || !location || !images) {
             throw new functions.https.HttpsError('invalid-argument', 'Missing required fields.');
@@ -114,6 +114,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
             userId,
             searchBy: title.toLowerCase(),
             createdAt: Date.now(),
+            isSafeDeal,
         };
 
         await newPostDocRef.set(newPost);

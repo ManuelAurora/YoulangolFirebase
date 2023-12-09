@@ -9,15 +9,15 @@ exports.getPostById = functions.https.onCall(async (data) => {
             throw new functions.https.HttpsError('invalid-argument', 'Post ID is required.');
         }
 
-        const doc = await admin.firestore().collection('posts')
+        const postDoc = await admin.firestore().collection('posts')
             .doc(postId)
             .get();
 
-        if (!doc.exists) {
+        if (!postDoc.exists) {
             throw new functions.https.HttpsError('not-found', 'Post not found.');
         }
 
-        const postData = doc.data();
+        const postData = postDoc.data();
 
         const [userRecord, userDoc] = await Promise.all([
             admin.auth().getUser(postData.userId),
@@ -31,7 +31,10 @@ exports.getPostById = functions.https.onCall(async (data) => {
         const { rating } = userDoc.data();
 
         return {
-            post: postData,
+            post: {
+                id: postDoc.id,
+                ...postData
+            },
             user: {
                 id: postData.userId,
                 creationTime: userRecord.metadata.creationTime,
