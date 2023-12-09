@@ -6,14 +6,11 @@ const { getUser } = require('./user/getUser');
 
 const { getUserById } = require('./user/getUserById');
 
-const { blockPost } = require('./posts/blockPost');
 const { closePost } = require('./posts/closePost');
 const { createPost } = require('./posts/createPost');
-const { editPost } = require('./posts/editPost');
 const { getPostById } = require('./posts/getPostById');
 const { getPosts } = require('./posts/getPosts');
 const { getPostsByUser } = require('./posts/getPostsByUser');
-const { purchasePost } = require('./posts/purchasePost');
 const { getChatUsersForClosedPost } = require('./posts/getChatUsersForClosedPost');
 const { getPostUserData } = require('./posts/getPostUserData');
 const { createChat } = require('./chat/createChat');
@@ -36,11 +33,8 @@ exports.getUser = getUser;
 
 exports.getUserById = getUserById;
 
-exports.purchasePost = purchasePost;
-exports.blockPost = blockPost;
 exports.closePost = closePost;
 exports.createPost = createPost;
-exports.editPost = editPost;
 exports.getPostById = getPostById;
 exports.getPosts = getPosts;
 exports.getPostsByUser = getPostsByUser;
