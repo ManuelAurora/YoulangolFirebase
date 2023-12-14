@@ -1,7 +1,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-exports.getReviews = functions.https.onCall(async (data, context) => {
+exports.getReviews = functions.https.onCall(async (data) => {
     try {
         const { userId } = data;
 

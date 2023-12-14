@@ -28,6 +28,10 @@ exports.closePost = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('permission-denied', 'You do not have permission to close this post');
         }
 
+        if (postData.status !== POST_STATUSES.OPEN) {
+            throw new functions.https.HttpsError('permission-denied', 'You can not close this post');
+        }
+
         await postRef.update({
             status: POST_STATUSES.CLOSED,
             buyerId: buyerId

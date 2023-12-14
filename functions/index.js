@@ -13,16 +13,26 @@ const { getPosts } = require('./posts/getPosts');
 const { getPostsByUser } = require('./posts/getPostsByUser');
 const { getChatUsersForClosedPost } = require('./posts/getChatUsersForClosedPost');
 const { getPostUserData } = require('./posts/getPostUserData');
+
 const { createChat } = require('./chat/createChat');
 const { getChatById } = require('./chat/getChatById');
 const { getChats } = require('./chat/getChats');
 const { sendMessage } = require('./chat/sendMessage');
+
 const { addRating } = require('./rating/addRating');
 const { getReviews } = require('./rating/getReviews');
+
 const { addPostToFavorite } = require('./favorite/addPostToFavorite');
 const { removePostFromFavorite } = require('./favorite/removePostFromFavorite');
 const { getFavoritePosts } = require('./favorite/getFavoritePosts');
 const { sendEmail } = require('./support/sendEmail');
+
+const { createOrder } = require('./orders/createOrder');
+const { getOrders } = require('./orders/getOrders');
+const { getOrderById } = require('./orders/getOrderById');
+const { approveOrder } = require('./orders/approveOrder');
+
+const { getPickupPoints } = require('./orders/getPickupPoints');
 
 admin.initializeApp();
 
@@ -52,5 +62,12 @@ exports.getReviews = getReviews;
 exports.addPostToFavorite = addPostToFavorite;
 exports.removePostFromFavorite = removePostFromFavorite;
 exports.getFavoritePosts = getFavoritePosts;
+
+exports.createOrder = createOrder;
+exports.getOrders = getOrders;
+exports.getOrderById = getOrderById;
+exports.approveOrder = approveOrder;
+
+exports.getPickupPoints = getPickupPoints;
 
 exports.sendEmail = sendEmail;
