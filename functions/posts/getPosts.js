@@ -2,6 +2,22 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
 /**
+ * Преобразует метры в километры.
+ * @param {number|string} meters - Значение в метрах, которое нужно преобразовать в километры.
+ * @returns {number|null} - Значение в километрах или null, если переданы неверные данные.
+ */
+function metersToKilometers(meters) {
+    const metersNumber = parseFloat(meters);
+
+    if (!isNaN(metersNumber) && metersNumber >= 0) {
+        return metersNumber / 1000;
+    }
+
+    return null;
+}
+
+
+/**
  * Вычисляет границы (bounding box) на основе координат и радиуса.
  *
  * @param {number} latitude - Широта в градусах.
@@ -13,10 +29,13 @@ function calculateBoundingBox(latitude, longitude, radius) {
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
         return {}
     }
-
     const EARTH_RADIUS = 6371;
+    const DEFAULT_SEARCH_RADIUS = 50;
+
+    const radiusInKilometers = metersToKilometers(radius) || DEFAULT_SEARCH_RADIUS;
+
     const radianLatitude = (Math.PI / 180) * latitude;
-    const radianRadius = (radius || 50) / EARTH_RADIUS;
+    const radianRadius = radiusInKilometers / EARTH_RADIUS;
     const degreesPerRadian = 180 / Math.PI;
 
     const degreesRadius = radianRadius * degreesPerRadian;
@@ -96,7 +115,7 @@ exports.getPosts = functions.https.onCall(
      * @param {Object} data.location - Информация о локации
      * @param {number} data.location.latitude - Широта
      * @param {number} data.location.longitude - Долгота
-     * @param {number|null} data.location.radius - Максимальный радиус поиска
+     * @param {number|null} data.location.radius - Максимальный радиус поиска в метрах
      *
      * @param {number} data.minPrice - Минимальная цена
      * @param {number} data.minPrice - Максимальная цена
