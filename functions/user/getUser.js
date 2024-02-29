@@ -7,19 +7,25 @@ exports.getUser = functions.https.onCall(async (data, context) => {
             throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to get your profile.');
         }
 
-        const userId = context.auth.uid;
+        const { uid } = context.auth;
 
-        const [userDoc, userRecord] = await Promise.all([
-            await admin.firestore().collection('users').doc(userId).get(),
-            await admin.auth().getUser(userId)
-        ]);
+        const userRecord = await admin.auth().getUser(uid);
+
+        const userDocRef = admin.firestore().collection('users').doc(uid);
+
+        let userDoc =  await userDocRef.get();
 
         if (!userDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'User not found.');
+            await userDocRef.set({
+                rating: 0,
+                activeChats: []
+            });
+
+            userDoc =  await userDocRef.get();
         }
 
         return {
-            id: userId,
+            id: uid,
             creationTime: userRecord.metadata.creationTime,
             emailVerified: userRecord.emailVerified,
             name: userRecord.displayName,

@@ -1,6 +1,5 @@
 const admin = require('firebase-admin');
 
-const { registerUser } = require('./user/registerUser');
 const { updateUser } = require('./user/updateUser');
 const { getUser } = require('./user/getUser');
 
@@ -37,7 +36,6 @@ const { getPickupPoints } = require('./orders/getPickupPoints');
 admin.initializeApp();
 
 
-exports.registerUser = registerUser;
 exports.updateUser = updateUser;
 exports.getUser = getUser;
 
