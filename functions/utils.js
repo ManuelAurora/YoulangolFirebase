@@ -1,4 +1,5 @@
-const { ORDER_STATUSES, ORDER_STATES } = require("./constants");
+const sharp = require('sharp');
+const { ORDER_STATUSES, ORDER_STATES } = require('./constants');
 
 /**
  * Получение первой картинки из массива изображений.
@@ -97,7 +98,30 @@ function getOrderMessages(status, state) {
     };
 }
 
+/**
+ * Обрезает и уменьшает размер изображения.
+ *
+ * @param {Buffer} imageBuffer - Буфер изображения для обработки.
+ * @param {number} maxWidth - Максимальная ширина изображения.
+ * @param {number} quality - Качество изображения (от 1 до 100).
+ * @returns {Promise<Buffer>} Буфер обработанного изображения.
+ */
+async function processImage(imageBuffer, maxWidth = 1280, quality = 90) {
+    try {
+        const resizedImageBuffer = await sharp(imageBuffer)
+            .resize({ width: maxWidth })
+            .jpeg({ quality })
+            .toBuffer();
+
+        return resizedImageBuffer;
+    } catch (error) {
+        console.error('Error processing image:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     getFirstImage,
     getOrderMessages,
+    processImage,
 };

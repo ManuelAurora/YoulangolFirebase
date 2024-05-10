@@ -1,7 +1,7 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const { POST_STATUSES } = require('../constants.js');
-
+const { processImage } = require('../utils');
 
 /**
  * Проверяет и преобразует данные гео.
@@ -88,6 +88,8 @@ exports.createPost = functions.https.onCall(async (data, context) => {
                 const base64WithoutPrefix = base64.replace(/^data:image\/[^;]+;base64,/, '');
                 const imageBuffer = Buffer.from(base64WithoutPrefix, 'base64');
 
+                const resizedImageBuffer = await processImage(imageBuffer);
+
                 const postFolderRef = admin.storage().bucket().file(postFolderName);
 
                 const [postFolderExists] = await postFolderRef.exists();
@@ -97,7 +99,7 @@ exports.createPost = functions.https.onCall(async (data, context) => {
                 }
 
                 const imageFileRef = admin.storage().bucket().file(`${postFolderName}${fileName}`);
-                await imageFileRef.save(imageBuffer, { metadata: { contentType: mimeType }});
+                await imageFileRef.save(resizedImageBuffer, { metadata: { contentType: mimeType }});
 
                 return `https://storage.googleapis.com/${admin.storage().bucket().name}/${imageFileRef.name}`;
             }),
