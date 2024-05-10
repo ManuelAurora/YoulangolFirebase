@@ -102,18 +102,18 @@ function getOrderMessages(status, state) {
  * Обрезает и уменьшает размер изображения.
  *
  * @param {Buffer} imageBuffer - Буфер изображения для обработки.
- * @param {number} maxWidth - Максимальная ширина изображения.
- * @param {number} quality - Качество изображения (от 1 до 100).
  * @returns {Promise<Buffer>} Буфер обработанного изображения.
  */
-async function processImage(imageBuffer, maxWidth = 1280, quality = 90) {
+async function processImage(imageBuffer) {
     try {
-        const resizedImageBuffer = await sharp(imageBuffer)
-            .resize({ width: maxWidth })
-            .jpeg({ quality })
+        return await sharp(imageBuffer)
+            .resize({
+                width: 1920,
+                height: 1080,
+                fit: 'inside',
+            })
+            .rotate()
             .toBuffer();
-
-        return resizedImageBuffer;
     } catch (error) {
         console.error('Error processing image:', error);
         throw error;
