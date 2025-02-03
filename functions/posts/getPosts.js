@@ -152,6 +152,7 @@ exports.getPosts = functions.https.onCall(
 
             let query = admin.firestore().collection('posts')
                 .where('status', '==', 'open')
+                .orderBy('createdAt', 'desc');
 
             if (category) {
                 query = query.where('categoryId', '==', category)
