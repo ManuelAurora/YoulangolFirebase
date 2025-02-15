@@ -1,68 +1,102 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-exports.createChat = functions.https.onCall(async (data, context) => {
+
+const firestore = getFirestore();
+
+// @todo: сделать по примеру createOrder
+// брать senderId из request.auth, переименовать в buyer - done
+// брать receiverId из post - done
+// убрать participants - хранить отдельно
+// проверять наличие чатов по buyerId / sellerId - .where("buyerId", "==", buyerId)
+export const createChat_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be authenticated to create a chat.');
+        if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'You must be authenticated to create a chat.');
         }
 
-        const { senderId, receiverId, postId } = data;
+        const buyerId = request.auth.uid;
 
-        if (!senderId || !receiverId || !postId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Sender, receiver and post IDs are required.');
+        const { postId } = request.data;
+
+        if (!postId) {
+            throw new HttpsError('invalid-argument', 'post Id are required.');
         }
 
-        if (senderId === receiverId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Sender and receiver IDs cannot be the same.');
+        // @todo: раскомментировать, удалить participants, existingChat и сохранение чатов в юзера
+        // const existingChatQuery = await firestore.collection('chats')
+        //     .where('postId', '==', postId)
+        //     .where("buyerId", "==", buyerId)
+        //     .limit(1)
+        //     .get();
+        //
+        // if (!existingChatQuery.empty) {
+        //     const existingChat = existingChatQuery.docs[0];
+        //     const chatId = existingChat.ref.id;
+        //
+        //     return { chatId };
+        // }
+
+        const postDoc = await firestore.collection("posts").doc(postId).get();
+
+        if (!postDoc.exists) {
+            throw new HttpsError("not-found", "Post not found.");
         }
 
-        const existingChatQuery = await admin.firestore().collection('chats')
+        const post = postDoc.data();
+        const sellerId = post.userId;
+
+        if (buyerId === sellerId) {
+            throw new HttpsError('invalid-argument', 'Sender and receiver cannot be the same.');
+        }
+
+        // @todo: <удалить/>
+        const existingChatQuery = await firestore.collection('chats')
             .where('postId', '==', postId)
-            .where('participants', 'array-contains-any', [senderId, receiverId])
-            .limit(1)
             .get();
 
-        if (!existingChatQuery.empty) {
-            const existingChat = existingChatQuery.docs[0];
-            const chatId = existingChat.ref.id;
+        const existingChat = existingChatQuery.docs.find(doc => {
+            const participants = doc.data().participants;
 
-            return { success: true, message: 'success', chatId };
+            return participants.includes(buyerId) && participants.includes(sellerId);
+        });
+
+        if (existingChat) {
+            return { chatId: existingChat.id };
         }
+        // </удалить>
 
-        const newChatRef = admin.firestore().collection('chats').doc();
+        const newChatRef = firestore.collection('chats').doc();
         const chatId = newChatRef.id;
+        const createTime = Date.now();
 
         const newChat = {
             chatId,
             postId,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            participants: [senderId, receiverId],
+            createdAt: createTime,
+            updatedAt: createTime,
+            participants: [buyerId, sellerId],
+            sellerId: sellerId,
+            buyerId: buyerId,
         };
 
         await newChatRef.set(newChat);
 
-        newChatRef.collection('messages');
-
+        // @todo: <удалить/>
         await Promise.all([
-            admin.firestore().collection('users')
-                .doc(senderId)
-                .update({ activeChats: admin.firestore.FieldValue.arrayUnion(chatId) }),
-
-            admin.firestore().collection('users')
-                .doc(receiverId)
-                .update({ activeChats: admin.firestore.FieldValue.arrayUnion(chatId) }),
+            firestore.collection('users').doc(buyerId).update({ activeChats: FieldValue.arrayUnion(chatId) }),
+            firestore.collection('users').doc(sellerId).update({ activeChats: FieldValue.arrayUnion(chatId) }),
         ]);
+        // </удалить>
 
-        return { success: true, message: 'success', chatId };
+        return { chatId };
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while creating the chat.', error.message);
+            throw new HttpsError('internal', 'An error occurred while creating the chat.', error.message);
         }
     }
 });

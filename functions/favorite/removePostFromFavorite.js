@@ -1,42 +1,49 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
-exports.removePostFromFavorite = functions.https.onCall(async (data, context) => {
+
+const firestore = getFirestore();
+
+export const removePostFromFavorite_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to remove post from favorite.');
+        if (!request.auth) {
+            throw new HttpsError("unauthenticated", "You must be logged in to remove post from favorite.");
         }
 
-        const userId = context.auth.uid;
-
-        const postId = data.postId;
+        const userId = request.auth.uid;
+        const postId = request.data.postId;
 
         if (!postId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Post ID is required.');
+            throw new HttpsError("invalid-argument", "Post ID is required.");
         }
 
-        const userRef = admin.firestore().collection('users').doc(userId);
+        const userRef = firestore.collection("users").doc(userId);
         const userDoc = await userRef.get();
 
         if (!userDoc.exists) {
-            throw new Error('User not found.');
+            await userRef.set({ favoritePosts: [] });
+
+            return {
+                success: true,
+                favoritePosts: [],
+            };
         }
 
         await userRef.update({
-            favoritePosts: admin.firestore.FieldValue.arrayRemove(postId),
+            favoritePosts: FieldValue.arrayRemove(postId),
         });
 
         const updatedUserDoc = await userRef.get();
         const updatedFavoritePosts = updatedUserDoc.data().favoritePosts || [];
 
-        return { success: true, favoritePosts: updatedFavoritePosts };
+        return { favoritePosts: updatedFavoritePosts };
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', error.toString(), { code: 400, ...error });
+            throw new HttpsError("internal", error.message);
         }
     }
 });

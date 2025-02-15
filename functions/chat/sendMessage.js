@@ -1,39 +1,39 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
 
-exports.sendMessage = functions.https.onCall(async (data, context) => {
+
+const firestore = getFirestore();
+
+export const sendMessage_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to send a message.');
+        if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'You must be logged in to send a message.');
         }
 
-        const senderId = context.auth.uid;
-
-        const { text, chatId } = data;
+        const senderId = request.auth.uid;
+        const { text, chatId } = request.data;
 
         if (!chatId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Chat ID is required.');
+            throw new HttpsError('invalid-argument', 'Chat ID is required.');
         }
 
         if (!text || typeof text !== 'string') {
-            throw new functions.https.HttpsError('invalid-argument', 'Text message is required and must be a string.');
+            throw new HttpsError('invalid-argument', 'Text message is required and must be a string.');
         }
 
-        const chatRef = admin.firestore().collection('chats').doc(chatId);
-
+        const chatRef = firestore.collection('chats').doc(chatId);
         const messageRef = chatRef.collection('messages').doc();
 
         const timestamp = Date.now();
 
         await Promise.all([
             chatRef.update({ updatedAt: timestamp }),
-
             messageRef.set({
                 id: messageRef.id,
                 senderId,
                 text,
                 timestamp,
-                isRead: false
+                isRead: false,
             }),
         ]);
 
@@ -41,10 +41,10 @@ exports.sendMessage = functions.https.onCall(async (data, context) => {
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while sending the message.', error.message);
+            throw new HttpsError('internal', 'An error occurred while sending the message.', error.message);
         }
     }
 });

@@ -1,39 +1,42 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import app from '../app.js';
 
-exports.getPostById = functions.https.onCall(async (data) => {
+
+const firestore = getFirestore();
+const auth = getAuth(app);
+
+export const getPostById_v2 = onCall(async (request) => {
     try {
-        const { postId } = data;
+        const { postId } = request.data;
 
         if (!postId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Post ID is required.');
+            throw new HttpsError('invalid-argument', 'Post ID is required.');
         }
 
-        const postDoc = await admin.firestore().collection('posts')
-            .doc(postId)
+        const postDoc = await firestore.collection('posts').doc(postId)
             .get();
 
         if (!postDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Post not found.');
+            throw new HttpsError('not-found', 'Post not found.');
         }
 
         const postData = postDoc.data();
 
         const [userRecord, userDoc] = await Promise.all([
-            admin.auth().getUser(postData.userId),
-            admin.firestore().collection('users').doc(postData.userId).get()
+            auth.getUser(postData.userId),
+            firestore.collection('users').doc(postData.userId)
+                .get(),
         ]);
 
-        if (!userDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'User not found.');
-        }
-
-        const { rating } = userDoc.data();
+        const userData = userDoc.exists ? userDoc.data() : {};
+        const rating = userData?.rating || null;
 
         return {
             post: {
                 id: postDoc.id,
-                ...postData
+                ...postData,
             },
             user: {
                 id: postData.userId,
@@ -48,10 +51,10 @@ exports.getPostById = functions.https.onCall(async (data) => {
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while fetching the post.', error.message);
+            throw new HttpsError('internal', 'An error occurred while fetching the post.', error.message);
         }
     }
 });

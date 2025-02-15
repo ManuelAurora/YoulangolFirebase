@@ -1,41 +1,45 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const { POST_STATUSES } = require('../constants.js');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
+import { POST_STATUSES } from '../constants.js';
 
-exports.getPostsByUser = functions.https.onCall(async (data) => {
+
+const firestore = getFirestore();
+
+export const getPostsByUser_v2 = onCall(async (request) => {
     try {
-        const { userId, status } = data;
+        const { userId, status } = request.data;
 
         if (!userId) {
-            throw new functions.https.HttpsError('invalid-argument', 'User ID is required.');
+            throw new HttpsError('invalid-argument', 'User ID is required.');
         }
 
-        let query = admin.firestore().collection('posts')
+        let query = firestore.collection('posts')
             .where('userId', '==', userId)
             .orderBy('createdAt', 'desc');
 
-        const isValidStatus = Object.values(POST_STATUSES).includes(status);
+
+        const isValidStatus = status && Object.values(POST_STATUSES).includes(status);
+
 
         if (isValidStatus) {
-            query = query.where('status', '==', status)
+            query = query.where('status', '==', status);
         }
 
         const snapshot = await query.get();
 
-        return await Promise.all(snapshot.docs.map(async (doc) => {
-            return {
+        return await Promise.all(
+            snapshot.docs.map(async doc => ({
                 id: doc.id,
-                ...doc.data()
-            };
-        }));
-
+                ...doc.data(),
+            })),
+        );
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while fetching posts by user.');
+            throw new HttpsError('internal', 'An error occurred while fetching posts by user.');
         }
     }
 });

@@ -1,71 +1,68 @@
-const admin = require('firebase-admin');
+import { updateUser_v2 } from './user/updateUser.js';
+import { getUser_v2 } from './user/getUser.js';
+import { getUserById_v2 } from './user/getUserById.js';
 
-const { updateUser } = require('./user/updateUser');
-const { getUser } = require('./user/getUser');
+import { closePost_v2 } from './posts/closePost.js';
+import { createPost_v2 } from './posts/createPost.js';
+import { getPostById_v2 } from './posts/getPostById.js';
+import { getPosts_v2 } from './posts/getPosts.js';
+import { getPostsByUser_v2 } from './posts/getPostsByUser.js';
+import { getChatUsersForClosedPost_v2 } from './posts/getChatUsersForClosedPost.js';
+import { getPostUserData_v2 } from './posts/getPostUserData.js';
 
-const { getUserById } = require('./user/getUserById');
+import { createChat_v2 } from './chat/createChat.js';
+import { getChatById_v2 } from './chat/getChatById.js';
+import { getChats_v2 } from './chat/getChats.js';
+import { sendMessage_v2 } from './chat/sendMessage.js';
 
-const { closePost } = require('./posts/closePost');
-const { createPost } = require('./posts/createPost');
-const { getPostById } = require('./posts/getPostById');
-const { getPosts } = require('./posts/getPosts');
-const { getPostsByUser } = require('./posts/getPostsByUser');
-const { getChatUsersForClosedPost } = require('./posts/getChatUsersForClosedPost');
-const { getPostUserData } = require('./posts/getPostUserData');
+import { addRating_v2 } from './rating/addRating.js';
+import { getReviews_v2 } from './rating/getReviews.js';
 
-const { createChat } = require('./chat/createChat');
-const { getChatById } = require('./chat/getChatById');
-const { getChats } = require('./chat/getChats');
-const { sendMessage } = require('./chat/sendMessage');
+import { addPostToFavorite_v2 } from './favorite/addPostToFavorite.js';
+import { removePostFromFavorite_v2 } from './favorite/removePostFromFavorite.js';
+import { getFavoritePosts_v2 } from './favorite/getFavoritePosts.js';
 
-const { addRating } = require('./rating/addRating');
-const { getReviews } = require('./rating/getReviews');
+import { createOrder_v2 } from './orders/createOrder.js';
+import { getOrders_v2 } from './orders/getOrders.js';
+import { getOrderById_v2 } from './orders/getOrderById.js';
+import { approveOrder_v2 } from './orders/approveOrder.js';
 
-const { addPostToFavorite } = require('./favorite/addPostToFavorite');
-const { removePostFromFavorite } = require('./favorite/removePostFromFavorite');
-const { getFavoritePosts } = require('./favorite/getFavoritePosts');
-const { sendEmail } = require('./support/sendEmail');
+import { getPickupPoints_v2 } from './orders/getPickupPoints.js';
 
-const { createOrder } = require('./orders/createOrder');
-const { getOrders } = require('./orders/getOrders');
-const { getOrderById } = require('./orders/getOrderById');
-const { approveOrder } = require('./orders/approveOrder');
-
-const { getPickupPoints } = require('./orders/getPickupPoints');
-
-admin.initializeApp();
+import { sendEmail_v2 } from './support/sendEmail.js';
 
 
-exports.updateUser = updateUser;
-exports.getUser = getUser;
+export {
+    updateUser_v2,
+    getUser_v2,
+    getUserById_v2,
 
-exports.getUserById = getUserById;
+    closePost_v2,
+    createPost_v2,
+    getPostById_v2,
+    getPosts_v2,
+    getPostsByUser_v2,
+    getChatUsersForClosedPost_v2,
+    getPostUserData_v2,
 
-exports.closePost = closePost;
-exports.createPost = createPost;
-exports.getPostById = getPostById;
-exports.getPosts = getPosts;
-exports.getPostsByUser = getPostsByUser;
-exports.getChatUsersForClosedPost = getChatUsersForClosedPost;
-exports.getPostUserData = getPostUserData;
+    createChat_v2,
+    getChatById_v2,
+    getChats_v2,
+    sendMessage_v2,
 
-exports.createChat = createChat;
-exports.getChatById = getChatById;
-exports.getChats = getChats;
-exports.sendMessage = sendMessage;
+    addRating_v2,
+    getReviews_v2,
 
-exports.addRating = addRating;
-exports.getReviews = getReviews;
+    addPostToFavorite_v2,
+    removePostFromFavorite_v2,
+    getFavoritePosts_v2,
 
-exports.addPostToFavorite = addPostToFavorite;
-exports.removePostFromFavorite = removePostFromFavorite;
-exports.getFavoritePosts = getFavoritePosts;
+    createOrder_v2,
+    getOrders_v2,
+    getOrderById_v2,
+    approveOrder_v2,
 
-exports.createOrder = createOrder;
-exports.getOrders = getOrders;
-exports.getOrderById = getOrderById;
-exports.approveOrder = approveOrder;
+    getPickupPoints_v2,
 
-exports.getPickupPoints = getPickupPoints;
-
-exports.sendEmail = sendEmail;
+    sendEmail_v2,
+};

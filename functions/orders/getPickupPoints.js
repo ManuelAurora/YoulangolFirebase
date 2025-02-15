@@ -1,32 +1,21 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
 
-exports.getPickupPoints = functions.https.onCall(async () => {
+
+const firestore = getFirestore();
+
+export const getPickupPoints_v2 = onCall(async () => {
     try {
-        const pickupPointsCollection = admin.firestore().collection('pickup_points');
-        const pickupPointsSnapshot = await pickupPointsCollection.get();
-
-        if (pickupPointsSnapshot.empty) {
-            return {
-                list: []
-            };
-        }
-
-        const pickupPoints = pickupPointsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
+        const snapshot = await firestore.collection('pickup_points').get();
 
         return {
-            list: pickupPoints
+            list: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })),
         };
     } catch (error) {
-        console.error(error);
+        console.error('Error fetching pickup points:', error);
 
-        if (error instanceof functions.https.HttpsError) {
-            throw error;
-        } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while fetching the reviews.', error.message);
-        }
+        throw error instanceof HttpsError ?
+            error :
+            new HttpsError('internal', 'Failed to fetch pickup points.', error.message);
     }
 });

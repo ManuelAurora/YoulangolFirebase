@@ -1,40 +1,43 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const { POST_STATUSES } = require('../constants.js');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
+import { POST_STATUSES } from '../constants.js';
 
-exports.closePost = functions.https.onCall(async (data, context) => {
+
+const firestore = getFirestore();
+
+export const closePost_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to close a post.');
+        if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'You must be logged in to close a post.');
         }
 
-        const { postId, buyerId = null } = data;
+        const { postId, buyerId = null } = request.data;
 
         if (!postId) {
-            throw new functions.https.HttpsError('invalid-argument', 'postId are required and must be strings.');
+            throw new HttpsError('invalid-argument', 'postId is required and must be a string.');
         }
 
-        const postRef = admin.firestore().collection('posts').doc(postId);
+        const postRef = firestore.collection('posts').doc(postId);
 
         const doc = await postRef.get();
 
         if (!doc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Post not found.');
+            throw new HttpsError('not-found', 'Post not found.');
         }
 
         const postData = doc.data();
 
-        if (postData.userId !== context.auth.uid) {
-            throw new functions.https.HttpsError('permission-denied', 'You do not have permission to close this post');
+        if (postData.userId !== request.auth.uid) {
+            throw new HttpsError('permission-denied', 'You do not have permission to close this post.');
         }
 
         if (postData.status !== POST_STATUSES.OPEN) {
-            throw new functions.https.HttpsError('permission-denied', 'You can not close this post');
+            throw new HttpsError('permission-denied', 'You cannot close this post.');
         }
 
         await postRef.update({
             status: POST_STATUSES.CLOSED,
-            buyerId: buyerId
+            buyerId,
         });
 
         return {
@@ -46,15 +49,11 @@ exports.closePost = functions.https.onCall(async (data, context) => {
                 title: postData.title,
                 images: postData.images,
                 price: postData.price,
-            }
+            },
         };
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
-            throw error;
-        } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while closing the post.', error.message);
-        }
+        throw new HttpsError('internal', 'An error occurred while closing the post.', error.message);
     }
 });

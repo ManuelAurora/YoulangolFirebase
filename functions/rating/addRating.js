@@ -1,48 +1,54 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import app from '../app.js';
 
-exports.addRating = functions.https.onCall(async (data, context) => {
+
+const firestore = getFirestore();
+const auth = getAuth(app);
+
+export const addRating_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to add a rating.');
+        if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'You must be logged in to add a rating.');
         }
-        const userId = context.auth.uid;
 
-        const { postId, sellerId, rating, message } = data;
+        const userId = request.auth.uid;
+        const { postId, sellerId, rating, message } = request.data;
 
         if (!postId || !rating || !sellerId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Invalid data. Please provide postId, rating and sellerId.');
+            throw new HttpsError('invalid-argument', 'Invalid data. Please provide postId, rating, and sellerId.');
         }
 
         if (typeof rating !== 'number' || rating < 1 || rating > 5) {
-            throw new functions.https.HttpsError('invalid-argument', 'Rating must be a number between 1 and 5.');
+            throw new HttpsError('invalid-argument', 'Rating must be a number between 1 and 5.');
         }
 
-        const postRef = admin.firestore().collection('posts').doc(postId);
+        const postRef = firestore.collection('posts').doc(postId);
         const postDoc = await postRef.get();
 
         if (!postDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Post not found.');
+            throw new HttpsError('not-found', 'Post not found.');
         }
 
         const postData = postDoc.data();
 
         if (postData.buyerId !== userId) {
-            throw new functions.https.HttpsError('permission-denied', 'You are not authorized to add a rating for this post.');
+            throw new HttpsError('permission-denied', 'You are not authorized to add a rating for this post.');
         }
 
         if (postData.isReviewed) {
-            throw new functions.https.HttpsError('already-exists', 'A review for this post has already been submitted.');
+            throw new HttpsError('already-exists', 'A review for this post has already been submitted.');
         }
 
-        const sellerRef = admin.firestore().collection('users').doc(sellerId);
+        const sellerRef = firestore.collection('users').doc(sellerId);
         const sellerDoc = await sellerRef.get();
 
         if (!sellerDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Seller not found.');
+            throw new HttpsError('not-found', 'Seller not found.');
         }
 
-        const userRecord = await admin.auth().getUser(userId);
+        const userRecord = await auth.getUser(userId);
 
         const ratingRef = sellerRef.collection('rating').doc();
 
@@ -75,10 +81,10 @@ exports.addRating = functions.https.onCall(async (data, context) => {
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while adding the rating.', error.message);
+            throw new HttpsError('internal', 'An error occurred while adding the rating.', error.message);
         }
     }
 });

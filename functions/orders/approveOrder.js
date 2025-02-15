@@ -1,33 +1,35 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const { POST_STATUSES, ORDER_STATES } = require('../constants.js');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
+import { POST_STATUSES, ORDER_STATES } from '../constants.js';
 
-exports.approveOrder = functions.https.onCall(async (data, context) => {
+
+const firestore = getFirestore();
+
+export const approveOrder_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be authenticated to create a chat.');
+        if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'You must be authenticated to approve an order.');
         }
 
-        const userId = context.auth.uid;
-
-        const { orderId } = data;
+        const userId = request.auth.uid;
+        const { orderId } = request.data;
 
         if (!orderId) {
-            throw new functions.https.HttpsError('invalid-argument', 'orderId is required.');
+            throw new HttpsError('invalid-argument', 'orderId is required.');
         }
 
-        const orderRef = admin.firestore().collection('orders').doc(orderId);
+        const orderRef = firestore.collection('orders').doc(orderId);
 
         const orderDoc = await orderRef.get();
 
         if (!orderDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Order not found');
+            throw new HttpsError('not-found', 'Order not found.');
         }
 
         const order = orderDoc.data();
 
         if (userId !== order.sellerId) {
-            throw new functions.https.HttpsError('permission-denied', ' You do not have permission to approve this order');
+            throw new HttpsError('permission-denied', 'You do not have permission to approve this order.');
         }
 
         await orderRef.update({
@@ -40,23 +42,24 @@ exports.approveOrder = functions.https.onCall(async (data, context) => {
                 [ORDER_STATES.IS_APPROVED]: {
                     time: Date.now(),
                     user: userId,
-                }
+                },
             },
         });
 
-        await admin.firestore().collection('posts').doc(order.postId).update({
-            // buyerId: order.buyerId, // @todo: обновлять после продажи
-            status: POST_STATUSES.HOLD,
-        });
+        await firestore.collection('posts')
+            .doc(order.postId)
+            .update({
+                status: POST_STATUSES.HOLD,
+            });
 
         return orderRef.id;
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+            throw new HttpsError('internal', error.message, { code: 400, ...error });
         }
     }
-})
+});

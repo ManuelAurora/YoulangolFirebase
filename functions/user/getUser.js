@@ -1,31 +1,38 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import app from '../app.js';
 
-exports.getUser = functions.https.onCall(async (data, context) => {
+
+const auth = getAuth(app);
+const firestore = getFirestore();
+
+export const getUser_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to get your profile.');
+        if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'You must be logged in to get your profile.');
         }
 
-        const { uid } = context.auth;
+        const userId = request.auth.uid;
 
-        const userRecord = await admin.auth().getUser(uid);
+        const userDocRef = firestore.collection('users').doc(userId);
 
-        const userDocRef = admin.firestore().collection('users').doc(uid);
-
-        let userDoc =  await userDocRef.get();
+        let [userRecord, userDoc] = await Promise.all([
+            auth.getUser(userId),
+            userDocRef.get(),
+        ]);
 
         if (!userDoc.exists) {
             await userDocRef.set({
                 rating: 0,
-                activeChats: []
+                activeChats: [],
             });
 
-            userDoc =  await userDocRef.get();
+            userDoc = await userDocRef.get();
         }
 
         return {
-            id: uid,
+            id: userId,
             creationTime: userRecord.metadata.creationTime,
             emailVerified: userRecord.emailVerified,
             name: userRecord.displayName,
@@ -33,15 +40,15 @@ exports.getUser = functions.https.onCall(async (data, context) => {
             phone: userRecord.phoneNumber,
             photoURL: userRecord.photoURL,
             disabled: userRecord.disabled,
-            ...userDoc.data()
+            ...userDoc.data(),
         };
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while getting your profile.', error.message);
+            throw new HttpsError('internal', 'An error occurred while getting your profile.', error.message);
         }
     }
 });

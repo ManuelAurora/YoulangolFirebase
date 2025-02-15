@@ -1,27 +1,43 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import app from '../app.js';
 
-exports.getPostUserData = functions.https.onCall(async (data, context) => {
+
+const auth = getAuth(app);
+const firestore = getFirestore();
+
+// @todo - переименовать в запрос инфы о пользователе и закинуть в user
+export const getPostUserData_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to get this profile.');
+        if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'You must be logged in to get this profile.');
         }
 
-        const { userId } = data;
+        const { userId } = request.data;
 
         if (!userId) {
-            throw new functions.https.HttpsError('invalid-argument', 'User ID is required.');
+            throw new HttpsError('invalid-argument', 'User ID is required.');
         }
 
-        const userDoc = await admin.firestore().collection('users').doc(userId).get();
+
+        const [userRecord, userDoc] = await Promise.all([
+            auth.getUser(userId).catch((error) => {
+                if (error.code === 'auth/user-not-found') {
+                    throw new HttpsError('not-found', 'User not found.');
+                }
+
+                throw error;
+            }),
+            firestore.collection('users').doc(userId)
+                .get(),
+        ]);
 
         if (!userDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'User not found.');
+            throw new HttpsError('not-found', 'User not found.');
         }
 
         const { rating } = userDoc.data();
-
-        const userRecord = await admin.auth().getUser(userId);
 
         return {
             id: userId,
@@ -32,15 +48,15 @@ exports.getPostUserData = functions.https.onCall(async (data, context) => {
             emailVerified: userRecord.emailVerified,
             photoURL: userRecord.photoURL,
             disabled: userRecord.disabled,
-            rating
+            rating,
         };
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while getting the user.', error.message);
+            throw new HttpsError('internal', 'An error occurred while getting the user.', error.message);
         }
     }
 });

@@ -1,38 +1,53 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import app from '../app.js';
 
-exports.getUserById = functions.https.onCall(async (data) => {
+
+const auth = getAuth(app);
+const firestore = getFirestore();
+
+export const getUserById_v2 = onCall(async (request) => {
     try {
-        const { userId } = data;
+        const { userId } = request.data;
 
         if (!userId) {
-            throw new functions.https.HttpsError('invalid-argument', 'User ID is required.');
+            throw new HttpsError('invalid-argument', 'User ID is required.');
         }
 
-        const userDoc = await admin.firestore().collection('users').doc(userId).get();
+        const [userRecord, userDoc] = await Promise.all([
+            auth.getUser(userId).catch((error) => {
+                if (error.code === 'auth/user-not-found') {
+                    throw new HttpsError('not-found', 'User not found.');
+                }
+
+                throw error;
+            }),
+            firestore.collection('users').doc(userId).get(),
+        ]);
 
         if (!userDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'User not found.');
+            throw new HttpsError('not-found', 'User not found.');
         }
 
-        const userRecord = await admin.auth().getUser(userId);
+        const { rating = null } = userDoc.data();
 
         return {
             id: userId,
+            name: userRecord.displayName,
             creationTime: userRecord.metadata.creationTime,
             emailVerified: userRecord.emailVerified,
-            name: userRecord.displayName,
             photoURL: userRecord.photoURL,
             disabled: userRecord.disabled,
-            ...userDoc.data()
+            rating,
         };
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while getting the user.', error.message);
+            throw new HttpsError('internal', 'An error occurred while getting the user.', error.message);
         }
     }
 });

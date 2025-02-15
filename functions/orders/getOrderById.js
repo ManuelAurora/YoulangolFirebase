@@ -1,57 +1,52 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const { getFirstImage, getOrderMessages } = require('../utils.js');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirstImage, getOrderMessages } from '../utils.js';
+import app from '../app.js';
 
-exports.getOrderById = functions.https.onCall(async (data, context) => {
+
+const auth = getAuth(app);
+const firestore = getFirestore();
+
+export const getOrderById_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be authenticated to create a chat.');
+        if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'You must be authenticated.');
         }
 
-        const userId = context.auth.uid;
-
-        const { orderId } = data;
+        const userId = request.auth.uid;
+        const { orderId } = request.data;
 
         if (!orderId) {
-            throw new functions.https.HttpsError('invalid-argument', 'orderId is required.');
+            throw new HttpsError('invalid-argument', 'orderId is required.');
         }
 
-        const orderDoc = await admin.firestore().collection('orders').doc(orderId).get();
+        const orderDoc = await firestore.collection('orders').doc(orderId)
+            .get();
 
         if (!orderDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Order not found.');
+            throw new HttpsError('not-found', 'Order not found.');
         }
 
         const orderData = orderDoc.data();
 
-        if (userId !== orderData.buyerId && userId !== orderData.sellerId) {
-            throw new functions.https.HttpsError('permission-denied', 'You do not have permission to view this order');
+        if (![orderData.buyerId, orderData.sellerId].includes(userId)) {
+            throw new HttpsError('permission-denied', 'You do not have permission to view this order.');
         }
 
-        const [seller, buyer, postDoc] = await Promise.all([
-            admin.auth().getUser(orderData.sellerId),
-            admin.auth().getUser(orderData.buyerId),
-            await admin.firestore().collection('posts').doc(orderData.postId).get(),
+        const [seller, buyer, postDoc, pickupPointDoc] = await Promise.all([
+            auth.getUser(orderData.sellerId),
+            auth.getUser(orderData.buyerId),
+            firestore.collection('posts').doc(orderData.postId).get(),
+            orderData.pointId ? firestore.collection('pickup_points').doc(orderData.pointId).get() : null,
         ]);
 
         if (!postDoc.exists) {
-            throw new functions.https.HttpsError('not-found', 'Post not found.');
+            throw new HttpsError('not-found', 'Post not found.');
         }
 
         const postData = postDoc.data();
-
-        if (orderData.pointId) {
-            const pickupPointDoc = await admin.firestore().collection('pickup_points').doc(orderData.pointId).get();
-
-            if (pickupPointDoc.exists) {
-                const pickupPointData = pickupPointDoc.data();
-
-                orderData.pickupPoint = {
-                    id: pickupPointDoc.id,
-                    ...pickupPointData
-                };
-            }
-        }
+        const pickupPointData = pickupPointDoc?.exists ? pickupPointDoc.data() : null;
 
         return {
             orderId: orderDoc.id,
@@ -61,30 +56,46 @@ exports.getOrderById = functions.https.onCall(async (data, context) => {
             post: {
                 id: orderData.postId,
                 title: postData.title,
+                description: postData.description,
+                category: postData.category,
+                images: postData.images,
                 image: getFirstImage(postData.images),
                 price: postData.price,
+                location: postData.location,
             },
             seller: {
-                id: orderData.sellerId,
+                id: seller.uid,
                 name: seller.displayName,
+                email: seller.email,
+                phoneNumber: seller.phoneNumber,
                 photoURL: seller.photoURL,
             },
             buyer: {
-                id: orderData.buyerId,
+                id: buyer.uid,
                 name: buyer.displayName,
+                email: buyer.email,
+                phoneNumber: buyer.phoneNumber,
                 photoURL: buyer.photoURL,
             },
-            point: orderData.pickupPoint,
+            pickupPoint: pickupPointData ?
+                {
+                    id: pickupPointDoc?.id,
+                    name: pickupPointData.name,
+                    address: pickupPointData.address,
+                    coordinates: pickupPointData.coordinates,
+                    workingHours: pickupPointData.workingHours,
+                } :
+                null,
             status: orderData.status,
             messages: getOrderMessages(orderData.status, orderData.state),
         };
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
+            throw new HttpsError('internal', error.message, { code: 400, ...error });
         }
     }
-})
+});

@@ -1,5 +1,6 @@
-const sharp = require('sharp');
-const { ORDER_STATUSES, ORDER_STATES } = require('./constants');
+import sharp from 'sharp';
+import { ORDER_STATUSES, ORDER_STATES } from './constants.js';
+
 
 /**
  * Получение первой картинки из массива изображений.
@@ -7,13 +8,13 @@ const { ORDER_STATUSES, ORDER_STATES } = require('./constants');
  * @param {Array} images - Массив изображений. Должен быть массивом.
  * @returns {String} - Первая картинка из массива или '', если массив пустой или не существует.
  */
-function getFirstImage(images) {
+export const getFirstImage = (images) => {
     if (!Array.isArray(images)) {
         return '';
     }
 
     return images[0] || '';
-}
+};
 
 /**
  * Получение локализованных сообщений для заданного статуса заказа и его состояния.
@@ -36,7 +37,7 @@ function getFirstImage(images) {
  * const messages = getOrderMessages(status, state);
  * // messages: { buyer: 'waiting_for_approval', seller: 'need_to_approve' }
  */
-function getOrderMessages(status, state) {
+export const getOrderMessages = (status, state) => {
     let buyerMessage = '';
     let sellerMessage = '';
 
@@ -52,7 +53,7 @@ function getOrderMessages(status, state) {
                 buyerMessage = 'waiting_for_delivery';
                 sellerMessage = 'need_to_deliver';
             } else if (!state[ORDER_STATES.IS_SOLD]) {
-                buyerMessage = 'need_to_check'
+                buyerMessage = 'need_to_check';
                 sellerMessage = 'waiting_for_check';
             } else if (!state[ORDER_STATES.IS_PAYMENT_RECEIVED]) {
                 buyerMessage = 'successful_purchase';
@@ -94,9 +95,9 @@ function getOrderMessages(status, state) {
 
     return {
         buyer: buyerMessage,
-        seller: sellerMessage
+        seller: sellerMessage,
     };
-}
+};
 
 /**
  * Обрезает и уменьшает размер изображения.
@@ -104,7 +105,7 @@ function getOrderMessages(status, state) {
  * @param {Buffer} imageBuffer - Буфер изображения для обработки.
  * @returns {Promise<Buffer>} Буфер обработанного изображения.
  */
-async function processImage(imageBuffer) {
+export const processImage = async (imageBuffer) => {
     try {
         return await sharp(imageBuffer)
             .resize({
@@ -118,10 +119,4 @@ async function processImage(imageBuffer) {
         console.error('Error processing image:', error);
         throw error;
     }
-}
-
-module.exports = {
-    getFirstImage,
-    getOrderMessages,
-    processImage,
 };

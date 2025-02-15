@@ -1,5 +1,6 @@
-const functions = require('firebase-functions');
-const nodemailer = require('nodemailer');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import nodemailer from 'nodemailer';
+
 
 const supportEmail = process.env.SUPPORT_EMAIL;
 const supportPassword = process.env.SUPPORT_PASSWORD;
@@ -10,35 +11,37 @@ const transporter = nodemailer.createTransport({
     port: 587,
     auth: {
         user: supportEmail,
-        pass: supportPassword
-    }
+        pass: supportPassword,
+    },
 });
 
-exports.sendEmail = functions.https.onCall(async (data, context) => {
-    const { userId, name, email, subject, text } = data;
+export const sendEmail_v2 = onCall(
+    { enforceAppCheck: false },
+    async (request) => {
+    const { userId, name, email, subject, text } = request.data;
 
     if (!userId || !name || !email || !subject || !text) {
-        throw new functions.https.HttpsError('invalid-argument', 'Invalid data. Please provide userId, name, email, subject and text.');
+        throw new HttpsError('invalid-argument', 'Invalid data. Please provide userId, name, email, subject, and text.');
     }
 
     const mailOptions = {
         from: supportEmail,
         to: supportEmail,
         subject: `[${email}]: ${subject}`,
-        text: `name: ${name}\nemail: ${email}\nuserId: ${userId}\nsubject: ${subject}\ntext: ${text}`
+        text: `Name: ${name}\nEmail: ${email}\nUserId: ${userId}\nSubject: ${subject}\nMessage:\n${text}`,
     };
 
     try {
         await transporter.sendMail(mailOptions);
 
-        return { success: true, message: 'Email sent successfully' };
+        return { message: 'Email sent successfully' };
     } catch (error) {
         console.error(error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         } else {
-            throw new functions.https.HttpsError('internal', 'An error occurred while sending email.', error.message);
+            throw new HttpsError('internal', 'An error occurred while sending email.', error.message);
         }
     }
 });

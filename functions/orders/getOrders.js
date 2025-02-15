@@ -1,72 +1,80 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-const { getFirstImage, getOrderMessages } = require('../utils.js');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirstImage, getOrderMessages } from '../utils.js';
+import app from '../app.js';
 
-exports.getOrders = functions.https.onCall(async (data, context) => {
+
+const firestore = getFirestore();
+const auth = getAuth(app);
+
+export const getOrders_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be authenticated to create a chat.');
+        if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'You must be authenticated to fetch orders.');
         }
 
-        const userId = context.auth.uid;
+        const userId = request.auth.uid;
+        const { status = 'sell' } = request.data;
 
-        const { status = 'sell' } = data;
+        const field = status === 'buy' ? 'buyerId' : 'sellerId';
+        const ordersSnapshot = await firestore
+            .collection('orders')
+            .where(field, '==', userId)
+            .get();
 
-        let ordersCollection;
 
-        if (status === 'buy') {
-            ordersCollection = await admin.firestore().collection('orders').where('buyerId', '==', userId).get();
-        } else {
-            ordersCollection = await admin.firestore().collection('orders').where('sellerId', '==', userId).get();
+        if (ordersSnapshot.empty) {
+            return [];
         }
 
-        return await Promise.all(ordersCollection.docs.map(async orderDoc => {
-            const orderData = orderDoc.data();
+        return Promise.all(
+            ordersSnapshot.docs.map(async (orderDoc) => {
+                const orderData = orderDoc.data();
+                const { sellerId, buyerId, postId } = orderData;
 
-            const [seller, buyer, postDoc] = await Promise.all([
-                admin.auth().getUser(orderData.sellerId),
-                admin.auth().getUser(orderData.buyerId),
-                await admin.firestore().collection('posts').doc(orderData.postId).get(),
-            ]);
+                const [seller, buyer, postDoc] = await Promise.all([
+                    auth.getUser(sellerId),
+                    auth.getUser(buyerId),
+                    firestore.collection('posts').doc(postId).get(),
+                ]);
 
-            if (!postDoc.exists) {
-                throw new functions.https.HttpsError('not-found', 'Post not found.');
-            }
+                if (!postDoc.exists) {
+                    console.warn(`Post not found: ${postId}`);
 
-            const postData = postDoc.data();
+                    return null;
+                }
 
-            return {
-                orderId: orderDoc.id,
-                id: orderData.id,
-                createTime: orderData.createTime,
-                status: orderData.status,
-                price: orderData.price,
-                messages: getOrderMessages(orderData.status, orderData.state),
-                post: {
-                    id: orderData.postId,
-                    title: postData.title,
-                    image: getFirstImage(postData.images),
-                    price: postData.price,
-                },
-                seller: {
-                    id: orderData.sellerId,
-                    name: seller.displayName,
-                    photoURL: seller.photoURL,
-                },
-                buyerId: {
-                    id: orderData.buyerId,
-                    name: buyer.displayName,
-                    photoURL: buyer.photoURL,
-                },
-            };
-        }));
+                const postData = postDoc.data();
+
+                return {
+                    orderId: orderDoc.id,
+                    ...orderData,
+                    messages: getOrderMessages(orderData.status, orderData.state),
+                    post: {
+                        id: postId,
+                        title: postData.title,
+                        image: getFirstImage(postData.images),
+                        price: postData.price,
+                    },
+                    seller: {
+                        id: sellerId,
+                        name: seller.displayName || '',
+                        photoURL: seller.photoURL || '',
+                    },
+                    buyer: {
+                        id: buyerId,
+                        name: buyer.displayName || '',
+                        photoURL: buyer.photoURL || '',
+                    },
+                };
+            }),
+        ).then(orders => orders.filter(Boolean));
     } catch (error) {
-        console.error(error);
+        console.error('Error fetching orders:', error);
 
-        if (error instanceof functions.https.HttpsError) {
-            throw error;
-        } else {
-            throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
-        }
+        throw error instanceof HttpsError ?
+            error :
+            new HttpsError('internal', 'Failed to fetch orders.', error.message);
     }
-})
+});

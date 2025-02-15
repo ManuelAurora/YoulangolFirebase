@@ -1,46 +1,43 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-exports.addPostToFavorite = functions.https.onCall(async (data, context) => {
+
+const firestore = getFirestore();
+
+export const addPostToFavorite_v2 = onCall(async (request) => {
     try {
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to add post to favorite.');
+        if (!request.auth) {
+            throw new HttpsError('unauthenticated', 'You must be logged in to add a post to favorites.');
         }
 
-        const userId = context.auth.uid;
-
-        const postId = data.postId;
+        const userId = request.auth.uid;
+        const { postId } = request.data;
 
         if (!postId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Post ID is required.');
+            throw new HttpsError('invalid-argument', 'Post ID is required.');
         }
 
-        const userRef = admin.firestore().collection('users').doc(userId);
+        const userRef = firestore.collection('users').doc(userId);
+
         const userDoc = await userRef.get();
 
         if (!userDoc.exists) {
-            throw new Error('User not found.');
-        }
+            await userRef.set({ favoritePosts: [postId] });
 
-        if (!userDoc.data().favoritePosts) {
-            await userRef.set({ favoritePosts: [] }, { merge: true });
+            return { favoritePosts: [postId] };
         }
 
         await userRef.update({
-            favoritePosts: admin.firestore.FieldValue.arrayUnion(postId),
+            favoritePosts: FieldValue.arrayUnion(postId),
         });
 
         const updatedUserDoc = await userRef.get();
+
         const updatedFavoritePosts = updatedUserDoc.data().favoritePosts || [];
 
-        return { success: true, favoritePosts: updatedFavoritePosts };
+        return { favoritePosts: updatedFavoritePosts };
     } catch (error) {
         console.error(error);
-
-        if (error instanceof functions.https.HttpsError) {
-            throw error;
-        } else {
-            throw new functions.https.HttpsError('internal', error.message, { code: 400, ...error });
-        }
+        throw new HttpsError('internal', 'An error occurred while adding the post to favorites.', error.message);
     }
 });

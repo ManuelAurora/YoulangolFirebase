@@ -1,5 +1,5 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { getFirestore } from 'firebase-admin/firestore';
 
 /**
  * Преобразует метры в километры.
@@ -16,7 +16,6 @@ function metersToKilometers(meters) {
     return null;
 }
 
-
 /**
  * Вычисляет границы (bounding box) на основе координат и радиуса.
  *
@@ -27,12 +26,13 @@ function metersToKilometers(meters) {
  */
 function calculateBoundingBox(latitude, longitude, radius) {
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-        return {}
+        return {};
     }
-    const EARTH_RADIUS = 6371;
-    const DEFAULT_SEARCH_RADIUS = 50;
 
-    const radiusInKilometers = metersToKilometers(radius) || DEFAULT_SEARCH_RADIUS;
+    const EARTH_RADIUS = 6371;
+    const DEFAULT_SEARCH_RADIUS = 60;
+
+    const radiusInKilometers = radius ? metersToKilometers(radius) : DEFAULT_SEARCH_RADIUS;
 
     const radianLatitude = (Math.PI / 180) * latitude;
     const radianRadius = radiusInKilometers / EARTH_RADIUS;
@@ -43,8 +43,8 @@ function calculateBoundingBox(latitude, longitude, radius) {
     return {
         minLatitude: latitude - degreesRadius,
         maxLatitude: latitude + degreesRadius,
-        minLongitude: longitude - (degreesRadius / Math.cos(radianLatitude)),
-        maxLongitude: longitude + (degreesRadius / Math.cos(radianLatitude))
+        minLongitude: longitude - degreesRadius / Math.cos(radianLatitude),
+        maxLongitude: longitude + degreesRadius / Math.cos(radianLatitude),
     };
 }
 
@@ -66,12 +66,13 @@ function calculateBoundingBox(latitude, longitude, radius) {
  */
 function filterPosts(posts, searchParams) {
     if (!Array.isArray(posts) || typeof searchParams !== 'object') {
-        throw new Error('Invalid input data.');
+        throw new TypeError('Invalid input data.');
     }
 
     return posts.filter((post) => {
         if (
-            (typeof searchParams.minLongitude === 'number' && typeof searchParams.maxLongitude === 'number') &&
+            typeof searchParams.minLongitude === 'number' &&
+            typeof searchParams.maxLongitude === 'number' &&
             !(post.location.lon >= searchParams.minLongitude && post.location.lon <= searchParams.maxLongitude)
         ) {
             return false;
@@ -86,16 +87,17 @@ function filterPosts(posts, searchParams) {
 
         if (
             searchParams.datePublished &&
-            (
-                (typeof searchParams.datePublished.from === 'number' && post.createdAt < searchParams.datePublished.from) ||
-                (typeof searchParams.datePublished.to === 'number' && post.createdAt > searchParams.datePublished.to)
-            )
+            ((typeof searchParams.datePublished.from === 'number' && post.createdAt < searchParams.datePublished.from) ||
+                (typeof searchParams.datePublished.to === 'number' && post.createdAt > searchParams.datePublished.to))
         ) {
             return false;
         }
 
-
-        if (typeof searchParams.search === 'string' && searchParams.search && !post.title.toLowerCase().includes(searchParams.search.toLowerCase())) {
+        if (
+            typeof searchParams.search === 'string' &&
+            searchParams.search &&
+            !post.title.toLowerCase().includes(searchParams.search.toLowerCase())
+        ) {
             return false;
         }
 
@@ -103,144 +105,55 @@ function filterPosts(posts, searchParams) {
     });
 }
 
+export const getPosts_v2 = onCall(async (request) => {
+    try {
+        const {
+            category,
+            location,
+            minPrice,
+            maxPrice,
+            datePublished,
+            search = '',
+            page = 1,
+            limit = 10,
+        } = request.data;
 
-exports.getPosts = functions.https.onCall(
-    /**
-     * Функция для фильтрации и поиска постов
-     *
-     * @param {Object} data - Параметры для фильтрации и поиска
-     *
-     * @param {string} data.category - Название категории
-     *
-     * @param {Object} data.location - Информация о локации
-     * @param {number} data.location.latitude - Широта
-     * @param {number} data.location.longitude - Долгота
-     * @param {number|null} data.location.radius - Максимальный радиус поиска в метрах
-     *
-     * @param {number} data.minPrice - Минимальная цена
-     * @param {number} data.minPrice - Максимальная цена
-     *
-     * @param {Object} data.datePublished - Диапазон даты публикации
-     * @param {number|null} data.datePublished.to - Конечная дата публикации
-     * @param {number|null} data.datePublished.from - Начальная дата публикации
+        const startAfter = (page - 1) * limit;
 
-     * @param {string|null} data.search - Поисковый запрос
+        let query = getFirestore()
+            .collection('posts')
+            .where('status', '==', 'open')
+            .orderBy('createdAt', 'desc');
 
-     * @param {string} [data.page=1] - Текущая страница
-     * @param {string|null} [data.limit=10] - Количество результатов на странице
-     * @returns {Array} - Отфильтрованный и отсортированный список постов
-     */
-    async (data) => {
-        try {
-            const {
-                category,
+        if (category) {
+            query = query.where('categoryId', '==', category);
+        }
 
-                location,
+        if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+            const { minLatitude, maxLatitude, minLongitude, maxLongitude } = calculateBoundingBox(
+                location.latitude,
+                location.longitude,
+                location.radius,
+            );
 
-                minPrice,
-                maxPrice,
-
-                datePublished,
-
-                search = '',
-
-                page = 1,
-                limit = 10,
-            } = data;
-
-            const startAfter = (page - 1) * limit;
-
-            let query = admin.firestore().collection('posts')
-                .where('status', '==', 'open')
-                .orderBy('createdAt', 'desc');
-
-            if (category) {
-                query = query.where('categoryId', '==', category)
-            }
-
-            if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
-                const {
-                    minLatitude,
-                    maxLatitude,
-                    minLongitude,
-                    maxLongitude
-                } = calculateBoundingBox(location.latitude, location.longitude, location.radius);
-
-
-                query = query
-                    .where('location.lat', '>=', minLatitude)
-                    .where('location.lat', '<=', maxLatitude)
-
-                const snapshot = await query.get();
-                const searchResults = snapshot.docs
-                    .map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-
-                const filteredPosts = filterPosts(searchResults, {
-                    minLongitude,
-                    maxLongitude,
-                    minPrice,
-                    maxPrice,
-                    datePublished,
-                    search
-                })
-
-                const resultsCount = filteredPosts.length;
-
-                return {
-                    posts: filteredPosts.slice(startAfter, startAfter + limit),
-                    resultsCount,
-                    page,
-                };
-            }
-
-            if (minPrice || maxPrice) {
-                if (minPrice) {
-                    query = query.where('price', '>=', minPrice);
-                }
-
-                if (maxPrice) {
-                    query = query.where('price', '<=', maxPrice);
-                }
-
-                const snapshot = await query.get();
-                const searchResults = snapshot.docs
-                    .map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-
-                const filteredPosts = filterPosts(searchResults, { datePublished, search })
-
-                const resultsCount = filteredPosts.length;
-
-                return {
-                    posts: filteredPosts.slice(startAfter, startAfter + limit),
-                    resultsCount,
-                    page,
-                };
-            }
-
-            if (datePublished) {
-                if (datePublished.from) {
-                    query = query.where('createdAt', '>=', datePublished.from);
-                }
-
-                if (datePublished.to) {
-                    query = query.where('createdAt', '<=', datePublished.to);
-                }
-            }
+            query = query
+                .where('location.lat', '>=', minLatitude)
+                .where('location.lat', '<=', maxLatitude);
 
             const snapshot = await query.get();
-            const searchResults = snapshot.docs
-                .map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
+            const searchResults = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+            }));
 
-            const filteredPosts = filterPosts(searchResults, { search })
+            const filteredPosts = filterPosts(searchResults, {
+                minLongitude,
+                maxLongitude,
+                minPrice,
+                maxPrice,
+                datePublished,
+                search,
+            });
 
             const resultsCount = filteredPosts.length;
 
@@ -249,14 +162,66 @@ exports.getPosts = functions.https.onCall(
                 resultsCount,
                 page,
             };
-        } catch (error) {
-            console.error(error);
+        }
 
-            if (error instanceof functions.https.HttpsError) {
-                throw error;
-            } else {
-                throw new functions.https.HttpsError('internal', 'An error occurred while performing the search.', error.message);
+        if (minPrice || maxPrice) {
+            if (minPrice) {
+                query = query.where('price', '>=', minPrice);
+            }
+
+            if (maxPrice) {
+                query = query.where('price', '<=', maxPrice);
+            }
+
+            const snapshot = await query.get();
+            const searchResults = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+            }));
+
+            const filteredPosts = filterPosts(searchResults, { datePublished, search });
+
+            const resultsCount = filteredPosts.length;
+
+            return {
+                posts: filteredPosts.slice(startAfter, startAfter + limit),
+                resultsCount,
+                page,
+            };
+        }
+
+        if (datePublished) {
+            if (datePublished.from) {
+                query = query.where('createdAt', '>=', datePublished.from);
+            }
+
+            if (datePublished.to) {
+                query = query.where('createdAt', '<=', datePublished.to);
             }
         }
-    },
-);
+
+        const snapshot = await query.get();
+        const searchResults = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+
+        const filteredPosts = filterPosts(searchResults, { search });
+
+        const resultsCount = filteredPosts.length;
+
+        return {
+            posts: filteredPosts.slice(startAfter, startAfter + limit),
+            resultsCount,
+            page,
+        };
+    } catch (error) {
+        console.error(error);
+
+        if (error instanceof HttpsError) {
+            throw error;
+        } else {
+            throw new HttpsError('internal', 'An error occurred while performing the search.', error.message);
+        }
+    }
+});
