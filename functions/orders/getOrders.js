@@ -8,7 +8,7 @@ import app from '../app.js';
 const firestore = getFirestore();
 const auth = getAuth(app);
 
-export const getOrders_v2 = onCall(async (request) => {
+export const getOrders = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be authenticated to fetch orders.');

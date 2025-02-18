@@ -8,7 +8,7 @@ const auth = getAuth(app);
 const firestore = getFirestore();
 
 // @todo - переименовать в запрос инфы о пользователе и закинуть в user
-export const getPostUserData_v2 = onCall(async (request) => {
+export const getPostUserData = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be logged in to get this profile.');

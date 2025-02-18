@@ -15,7 +15,7 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-export const sendEmail_v2 = onCall(
+export const sendEmail = onCall(
     { enforceAppCheck: false },
     async (request) => {
     const { userId, name, email, subject, text } = request.data;

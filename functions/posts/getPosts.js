@@ -105,7 +105,7 @@ function filterPosts(posts, searchParams) {
     });
 }
 
-export const getPosts_v2 = onCall(async (request) => {
+export const getPosts = onCall(async (request) => {
     try {
         const {
             category,

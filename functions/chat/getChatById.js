@@ -8,7 +8,7 @@ import app from '../app.js';
 const firestore = getFirestore();
 const auth = getAuth(app);
 
-export const getChatById_v2 = onCall(async (request) => {
+export const getChatById = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be logged in to retrieve a chat.');
@@ -20,7 +20,9 @@ export const getChatById_v2 = onCall(async (request) => {
             throw new HttpsError('invalid-argument', 'Chat ID is required.');
         }
 
-        const chatDoc = await firestore.collection('chats').doc(chatId).get();
+        const chatDoc = await firestore.collection('chats')
+            .doc(chatId)
+            .get();
 
         if (!chatDoc.exists) {
             throw new HttpsError('not-found', 'Chat not found.');
@@ -28,17 +30,18 @@ export const getChatById_v2 = onCall(async (request) => {
 
         const chatData = chatDoc.data();
         const currentUserId = request.auth.uid;
+        const participants = [chatData.buyerId, chatData.sellerId];
 
-        if (!chatData.participants.includes(currentUserId)) {
+        if (!participants.includes(currentUserId)) {
             throw new HttpsError('permission-denied', 'You do not have permission to read this chat');
         }
 
         const postId = chatData.postId;
-        const participantId = chatData.participants.find(id => id !== currentUserId);
+        const participantId = participants.find(id => id !== currentUserId);
 
         const [
             postDoc,
-            participantSnapshot
+            participantSnapshot,
         ] = await Promise.all([
             firestore.collection('posts').doc(postId).get(),
             auth.getUser(participantId),

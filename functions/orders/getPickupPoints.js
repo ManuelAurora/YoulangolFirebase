@@ -4,7 +4,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 const firestore = getFirestore();
 
-export const getPickupPoints_v2 = onCall(async () => {
+export const getPickupPoints = onCall(async () => {
     try {
         const snapshot = await firestore.collection('pickup_points').get();
 

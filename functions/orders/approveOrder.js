@@ -5,7 +5,7 @@ import { POST_STATUSES, ORDER_STATES } from '../constants.js';
 
 const firestore = getFirestore();
 
-export const approveOrder_v2 = onCall(async (request) => {
+export const approveOrder = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be authenticated to approve an order.');

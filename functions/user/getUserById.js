@@ -7,7 +7,7 @@ import app from '../app.js';
 const auth = getAuth(app);
 const firestore = getFirestore();
 
-export const getUserById_v2 = onCall(async (request) => {
+export const getUserById = onCall(async (request) => {
     try {
         const { userId } = request.data;
 

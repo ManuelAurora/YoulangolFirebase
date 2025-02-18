@@ -7,7 +7,7 @@ import app from '../app.js';
 const firestore = getFirestore();
 const auth = getAuth(app);
 
-export const getPostById_v2 = onCall(async (request) => {
+export const getPostById = onCall(async (request) => {
     try {
         const { postId } = request.data;
 

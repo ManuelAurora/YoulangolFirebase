@@ -7,7 +7,7 @@ import app from '../app.js';
 const firestore = getFirestore();
 const auth = getAuth(app);
 
-export const addRating_v2 = onCall(async (request) => {
+export const addRating = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be logged in to add a rating.');

@@ -75,7 +75,7 @@ async function saveImage(userId, postId, base64, mimeType) {
     return `https://storage.googleapis.com/${bucket.name}/${filePath}`;
 }
 
-export const createPost_v2 = onCall(async (request) => {
+export const createPost = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be logged in to create a post.');

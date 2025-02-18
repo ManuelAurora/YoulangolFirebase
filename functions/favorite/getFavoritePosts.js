@@ -4,7 +4,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 const firestore = getFirestore();
 
-export const getFavoritePosts_v2 = onCall(async (request) => {
+export const getFavoritePosts = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be logged in to get favorite posts.');

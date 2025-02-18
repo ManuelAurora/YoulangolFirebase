@@ -8,7 +8,7 @@ import app from '../app.js';
 const firestore = getFirestore();
 const auth = getAuth(app);
 
-export const getChats_v2 = onCall(async (request) => {
+export const getChats = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be logged in to retrieve chats.');
@@ -16,34 +16,22 @@ export const getChats_v2 = onCall(async (request) => {
 
         const userId = request.auth.uid;
 
-        const userDoc = await firestore
-            .collection('users')
-            .doc(userId)
-            .get();
+        const [sellerChatsSnapshot, buyerChatsSnapshot] = await Promise.all([
+            firestore.collection('chats').where('sellerId', '==', userId).get(),
+            firestore.collection('chats').where('buyerId', '==', userId).get(),
+        ]);
 
-        if (!userDoc.exists) {
-            throw new HttpsError('not-found', 'User not found.');
-        }
+        const allChats = [...sellerChatsSnapshot.docs, ...buyerChatsSnapshot.docs];
 
-        const { activeChats } = userDoc.data();
-
-        const hasActiveChats = Array.isArray(activeChats) && activeChats.length;
-
-        if (!hasActiveChats) {
+        if (!allChats.length) {
             return [];
         }
 
-        const querySnapshot = await firestore
-            .collection('chats')
-            .where('__name__', 'in', activeChats)
-            .get();
-
-        const chatPromises = querySnapshot.docs.map(async (chat) => {
+        const chatPromises = allChats.map(async (chat) => {
             const chatData = chat.data();
-
             const chatId = chat.id;
             const postId = chatData.postId;
-            const participantId = chatData.participants.find(id => id !== userId);
+            const participantId = chatData.sellerId === userId ? chatData.buyerId : chatData.sellerId;
 
             const [lastMessageSnapshot, postDoc, participantUser] = await Promise.all([
                 firestore.collection('chats')

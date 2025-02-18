@@ -5,7 +5,7 @@ import { POST_STATUSES } from '../constants.js';
 
 const firestore = getFirestore();
 
-export const closePost_v2 = onCall(async (request) => {
+export const closePost = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be logged in to close a post.');

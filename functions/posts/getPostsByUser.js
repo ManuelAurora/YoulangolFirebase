@@ -5,7 +5,7 @@ import { POST_STATUSES } from '../constants.js';
 
 const firestore = getFirestore();
 
-export const getPostsByUser_v2 = onCall(async (request) => {
+export const getPostsByUser = onCall(async (request) => {
     try {
         const { userId, status } = request.data;
 

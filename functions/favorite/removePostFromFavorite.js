@@ -4,7 +4,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
 const firestore = getFirestore();
 
-export const removePostFromFavorite_v2 = onCall(async (request) => {
+export const removePostFromFavorite = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "You must be logged in to remove post from favorite.");

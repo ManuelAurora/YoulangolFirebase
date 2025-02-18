@@ -4,7 +4,7 @@ import { getFirestore } from "firebase-admin/firestore";
 
 const firestore = getFirestore();
 
-export const getReviews_v2 = onCall(async (request) => {
+export const getReviews = onCall(async (request) => {
     try {
         const { userId } = request.data;
 

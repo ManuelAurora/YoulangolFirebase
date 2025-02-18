@@ -4,7 +4,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const firestore = getFirestore();
 
-export const addPostToFavorite_v2 = onCall(async (request) => {
+export const addPostToFavorite = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be logged in to add a post to favorites.');

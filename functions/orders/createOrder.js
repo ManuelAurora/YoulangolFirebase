@@ -5,7 +5,7 @@ import { POST_STATUSES, ORDER_STATUSES, ORDER_STATES } from '../constants.js';
 
 const firestore = getFirestore();
 
-export const createOrder_v2 = onCall(async (request) => {
+export const createOrder = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be authenticated to create an order.');
@@ -22,6 +22,20 @@ export const createOrder_v2 = onCall(async (request) => {
             throw new HttpsError('invalid-argument', 'pointId is required.');
         }
 
+
+        const existingOrderQuery = await firestore.collection('orders')
+            .where('buyerId', '==', userId)
+            .where('postId', '==', postId)
+            .limit(1)
+            .get();
+
+        if (!existingOrderQuery.empty) {
+            const existingOrder = existingOrderQuery.docs[0];
+
+            return { orderId: existingOrder.id };
+        }
+
+
         const postDoc = await firestore.collection('posts').doc(postId).get();
 
         if (!postDoc.exists) {
@@ -36,18 +50,6 @@ export const createOrder_v2 = onCall(async (request) => {
 
         if (userId === post.userId) {
             throw new HttpsError('permission-denied', 'Buyer and seller cannot be the same user.');
-        }
-
-        const existingOrderQuery = await firestore.collection('orders')
-            .where('buyerId', '==', userId)
-            .where('postId', '==', postId)
-            .limit(1)
-            .get();
-
-        if (!existingOrderQuery.empty) {
-            const existingOrder = existingOrderQuery.docs[0];
-
-            return { orderId: existingOrder.id };
         }
 
         const createTime = Date.now();

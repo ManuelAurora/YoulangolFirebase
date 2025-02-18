@@ -7,7 +7,7 @@ import app from '../app.js';
 const auth = getAuth(app);
 const firestore = getFirestore();
 
-export const getUser_v2 = onCall(async (request) => {
+export const getUser = onCall(async (request) => {
     try {
         if (!request.auth) {
             throw new HttpsError('unauthenticated', 'You must be logged in to get your profile.');
@@ -25,7 +25,6 @@ export const getUser_v2 = onCall(async (request) => {
         if (!userDoc.exists) {
             await userDocRef.set({
                 rating: 0,
-                activeChats: [],
             });
 
             userDoc = await userDocRef.get();

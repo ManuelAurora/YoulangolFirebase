@@ -40,7 +40,7 @@ async function updateUserAuth(userId, updates) {
     }
 }
 
-export const updateUser_v2 = onCall(async (request) => {
+export const updateUser = onCall(async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in to update your profile.');
     }
