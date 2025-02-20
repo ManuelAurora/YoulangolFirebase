@@ -24,7 +24,12 @@ async function uploadUserImage(userId, image) {
     const imageBuffer = Buffer.from(base64Data, 'base64');
     const resizedImageBuffer = await processImage(imageBuffer);
 
-    await fileRef.save(resizedImageBuffer, { metadata: { contentType: image.mimeType } });
+    await fileRef.save(resizedImageBuffer, {
+        metadata: {
+            contentType: image.mimeType,
+            cacheControl: 'public, max-age=31536000',
+        }
+    });
 
     return `https://storage.googleapis.com/${bucket.name}/${filePath}`;
 }

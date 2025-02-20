@@ -70,7 +70,12 @@ async function saveImage(userId, postId, base64, mimeType) {
 
     const fileRef = bucket.file(filePath);
 
-    await fileRef.save(resizedImageBuffer, { metadata: { contentType: mimeType } });
+    await fileRef.save(resizedImageBuffer, {
+        metadata: {
+            contentType: mimeType,
+            cacheControl: 'public, max-age=31536000',
+        }
+    });
 
     return `https://storage.googleapis.com/${bucket.name}/${filePath}`;
 }
