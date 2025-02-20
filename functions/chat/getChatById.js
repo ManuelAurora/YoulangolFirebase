@@ -65,6 +65,7 @@ export const getChatById = onCall(async (request) => {
                 isSafeDeal: postData.isSafeDeal,
                 isReviewed: postData.isReviewed,
                 buyerId: postData.buyerId,
+                userId: postData.userId,
             },
 
             participant: {
