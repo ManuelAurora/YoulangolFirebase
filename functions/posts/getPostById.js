@@ -2,7 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import app from '../app.js';
-import { getPreviewImage } from "../utils.js";
+import { getPreviewImage } from '../utils.js';
 
 
 const firestore = getFirestore();

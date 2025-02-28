@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getPreviewImage } from '../utils.js';
 
 /**
  * Преобразует метры в километры.
@@ -105,6 +106,39 @@ function filterPosts(posts, searchParams) {
     });
 }
 
+/**
+ * Преобразует документ Firestore в объект типа Post.
+ * @param {firebase.firestore.DocumentData} doc - Документ Firestore.
+ * @returns {Object} - Объект типа Post.
+ */
+function mapDocumentToPost(doc) {
+    const data = doc.data();
+
+    return {
+        id: doc.id,
+        createdAt: data.createdAt,
+        preview: data.preview || getPreviewImage(data),
+        price: data.price,
+        description: data.description,
+        location: data.location,
+        isSafeDeal: data.isSafeDeal,
+        title: data.title,
+        userId: data.userId,
+        categoryId: data.categoryId,
+        status: data.status,
+    };
+}
+
+/**
+ * Преобразует массив документов Firestore в массив объектов типа Post.
+ * @param {firebase.firestore.DocumentData[]} docs - Массив документов Firestore.
+ * @returns {Object[]} - Массив объектов типа Post.
+ */
+function mapDocumentsToPosts(docs) {
+    return docs.map(mapDocumentToPost);
+}
+
+
 export const getPosts = onCall(async (request) => {
     try {
         const {
@@ -141,10 +175,7 @@ export const getPosts = onCall(async (request) => {
                 .where('location.lat', '<=', maxLatitude);
 
             const snapshot = await query.get();
-            const searchResults = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
+            const searchResults = mapDocumentsToPosts(snapshot.docs);
 
             const filteredPosts = filterPosts(searchResults, {
                 minLongitude,
@@ -174,10 +205,7 @@ export const getPosts = onCall(async (request) => {
             }
 
             const snapshot = await query.get();
-            const searchResults = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
+            const searchResults = mapDocumentsToPosts(snapshot.docs);
 
             const filteredPosts = filterPosts(searchResults, { datePublished, search });
 
@@ -201,10 +229,7 @@ export const getPosts = onCall(async (request) => {
         }
 
         const snapshot = await query.get();
-        const searchResults = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-        }));
+        const searchResults = mapDocumentsToPosts(snapshot.docs);
 
         const filteredPosts = filterPosts(searchResults, { search });
 
