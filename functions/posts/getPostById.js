@@ -2,6 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import app from '../app.js';
+import { getPreviewImage } from "../utils.js";
 
 
 const firestore = getFirestore();
@@ -37,6 +38,7 @@ export const getPostById = onCall(async (request) => {
             post: {
                 id: postDoc.id,
                 ...postData,
+                preview: postData.preview || getPreviewImage(postData),
             },
             user: {
                 id: postData.userId,

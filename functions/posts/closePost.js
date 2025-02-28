@@ -35,6 +35,8 @@ export const closePost = onCall(async (request) => {
             throw new HttpsError('permission-denied', 'You cannot close this post.');
         }
 
+        // @todo: Добавить проверку на ордеры - нужно ли если статус hold у постов с ордерами
+
         await postRef.update({
             status: POST_STATUSES.CLOSED,
             buyerId,

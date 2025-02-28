@@ -22,7 +22,7 @@ async function uploadUserImage(userId, image) {
 
     const base64Data = image.base64.replace(/^data:image\/[^;]+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
-    const resizedImageBuffer = await processImage(imageBuffer);
+    const resizedImageBuffer = await processImage(imageBuffer, 300, 300);
 
     await fileRef.save(resizedImageBuffer, {
         metadata: {

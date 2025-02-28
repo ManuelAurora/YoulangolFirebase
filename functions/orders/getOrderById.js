@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirstImage, getOrderMessages } from '../utils.js';
+import { getPreviewImage, getOrderMessages } from '../utils.js';
 import app from '../app.js';
 
 
@@ -57,10 +57,7 @@ export const getOrderById = onCall(async (request) => {
                 id: orderData.postId,
                 title: postData.title,
                 description: postData.description,
-                category: postData.category,
-                images: postData.images,
-                image: getFirstImage(postData.images),
-                price: postData.price,
+                preview: postData.preview || getPreviewImage(postData),
                 location: postData.location,
             },
             seller: {

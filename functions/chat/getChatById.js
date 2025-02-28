@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirstImage } from '../utils.js';
+import { getPreviewImage } from '../utils.js';
 import app from '../app.js';
 
 
@@ -58,7 +58,7 @@ export const getChatById = onCall(async (request) => {
                 id: postId,
                 categoryId: postData.categoryId,
                 location: postData.location,
-                image: getFirstImage(postData.images),
+                preview: postData.preview || getPreviewImage(postData),
                 title: postData.title,
                 price: postData.price,
                 status: postData.status,

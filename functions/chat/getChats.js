@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getFirstImage } from '../utils.js';
+import { getPreviewImage } from '../utils.js';
 import app from '../app.js';
 
 
@@ -48,7 +48,7 @@ export const getChats = onCall(async (request) => {
 
             let lastMessage = null;
             let unreadCount = 0;
-            let postPhoto = '';
+            let postPreview = '';
             let postTitle = '';
 
             if (!lastMessageSnapshot.empty) {
@@ -70,7 +70,7 @@ export const getChats = onCall(async (request) => {
             if (postDoc.exists) {
                 const postData = postDoc.data();
 
-                postPhoto = getFirstImage(postData.images);
+                postPreview = postData.preview || getPreviewImage(postData);
                 postTitle = postData.title;
             }
 
@@ -80,7 +80,7 @@ export const getChats = onCall(async (request) => {
                 lastMessage,
                 post: {
                     id: postId,
-                    image: postPhoto,
+                    preview: postPreview,
                     title: postTitle,
                 },
                 participant: {

@@ -5,16 +5,17 @@ import { ORDER_STATUSES, ORDER_STATES } from './constants.js';
 /**
  * Получение первой картинки из массива изображений.
  *
- * @param {Array} images - Массив изображений. Должен быть массивом.
- * @returns {String} - Первая картинка из массива или '', если массив пустой или не существует.
+ * Если `image` существует, она будет возвращена. В противном случае,
+ * если `images` является массивом, будет возвращена первая картинка из массива.
+ * Если массив пустой или не существует, возвращается пустая строка.
+ *
+ * @param {Object} params - Параметры функции.
+ * @param {string} [params.preview] - Первая картинка, если она передана.
+ * @param {Array} [params.images] - Массив изображений.
+ * @returns {string} - Первая картинка из массива или пустая строка, если данных нет.
  */
-export const getFirstImage = (images) => {
-    if (!Array.isArray(images)) {
-        return '';
-    }
+export const getPreviewImage = ({ preview, images }) => preview || (Array.isArray(images) ? images[0] : '');
 
-    return images[0] || '';
-};
 
 /**
  * Получение локализованных сообщений для заданного статуса заказа и его состояния.
@@ -103,14 +104,16 @@ export const getOrderMessages = (status, state) => {
  * Обрезает и уменьшает размер изображения.
  *
  * @param {Buffer} imageBuffer - Буфер изображения для обработки.
+ * @param {number} [width=1920] - Максимальная ширина изображения.
+ * @param {number} [height=1080] - Максимальная высота изображения.
  * @returns {Promise<Buffer>} Буфер обработанного изображения.
  */
-export const processImage = async (imageBuffer) => {
+export const processImage = async (imageBuffer, width = 1920, height = 1080) => {
     try {
         return await sharp(imageBuffer)
             .resize({
-                width: 1920,
-                height: 1080,
+                width,
+                height,
                 fit: 'inside',
             })
             .rotate()

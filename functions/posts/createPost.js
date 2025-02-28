@@ -57,16 +57,23 @@ function parseLocation(location) {
  * @param {string} postId - ID поста.
  * @param {string} base64 - Изображение в формате base64.
  * @param {string} mimeType - MIME-тип изображения.
+ * @param {boolean} isSmall - сохранить как миниатюру.
  * @returns {Promise<string>} URL сохраненного изображения.
  */
-async function saveImage(userId, postId, base64, mimeType) {
+async function saveImage(userId, postId, base64, mimeType, isSmall = false) {
     const fileName = `post_${postId}_${Date.now()}.${mimeType.split('/')[1]}`;
     const filePath = `User_${userId}/Post_${postId}/${fileName}`;
 
     const base64WithoutPrefix = base64.replace(/^data:image\/[^;]+;base64,/, '');
     const imageBuffer = Buffer.from(base64WithoutPrefix, 'base64');
 
-    const resizedImageBuffer = await processImage(imageBuffer);
+    let resizedImageBuffer
+
+    if (isSmall) {
+        resizedImageBuffer = await processImage(imageBuffer, 360, 360);
+    } else {
+        resizedImageBuffer = await processImage(imageBuffer);
+    }
 
     const fileRef = bucket.file(filePath);
 
@@ -109,6 +116,9 @@ export const createPost = onCall(async (request) => {
             images.map(image => saveImage(userId, postId, image.base64, image.mimeType)),
         );
 
+        const firstImage = images[0];
+        const preview = await saveImage(userId, postId, firstImage.base64, firstImage.mimeType, true);
+
         const newPost = {
             status: POST_STATUSES.OPEN,
             title,
@@ -116,6 +126,7 @@ export const createPost = onCall(async (request) => {
             price: parsedPrice,
             categoryId,
             location: locationData,
+            preview,
             images: uploadedImages,
             userId,
             createdAt: Date.now(),
