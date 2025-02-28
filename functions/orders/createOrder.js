@@ -11,7 +11,7 @@ export const createOrder = onCall(async (request) => {
             throw new HttpsError('unauthenticated', 'You must be authenticated to create an order.');
         }
 
-        const userId = request.auth.uid;
+        const buyerId = request.auth.uid;
         const { postId, pointId } = request.data;
 
         if (!postId) {
@@ -24,7 +24,7 @@ export const createOrder = onCall(async (request) => {
 
 
         const existingOrderQuery = await firestore.collection('orders')
-            .where('buyerId', '==', userId)
+            .where('buyerId', '==', buyerId)
             .where('postId', '==', postId)
             .limit(1)
             .get();
@@ -36,7 +36,8 @@ export const createOrder = onCall(async (request) => {
         }
 
 
-        const postDoc = await firestore.collection('posts').doc(postId).get();
+        const postDoc = await firestore.collection('posts').doc(postId)
+            .get();
 
         if (!postDoc.exists) {
             throw new HttpsError('not-found', 'Post not found.');
@@ -48,19 +49,54 @@ export const createOrder = onCall(async (request) => {
             throw new HttpsError('permission-denied', 'Invalid post status. Only open posts can be ordered.');
         }
 
-        if (userId === post.userId) {
+        const sellerId = post.userId;
+
+        if (buyerId === sellerId) {
             throw new HttpsError('permission-denied', 'Buyer and seller cannot be the same user.');
         }
 
-        const createTime = Date.now();
+
+        const existingChatQuery = await firestore.collection('chats')
+            .where('postId', '==', postId)
+            .where('buyerId', '==', buyerId)
+            .limit(1)
+            .get();
+
+        let chatId = '';
+
+        if (!existingChatQuery.empty) {
+            const existingChat = existingChatQuery.docs[0];
+
+            chatId = existingChat.id;
+        } else {
+            const newChatRef = firestore.collection('chats').doc();
+
+
+            const createdAt = Date.now();
+
+            await newChatRef.set({
+                chatId,
+                postId,
+                sellerId,
+                buyerId,
+                createdAt,
+                updatedAt: createdAt,
+            });
+
+            chatId = newChatRef.id;
+        }
+
+
+        const createdAt = Date.now();
 
         const orderData = {
-            id: createTime,
+            id: createdAt,
             postId,
-            sellerId: post.userId,
-            buyerId: userId,
+            sellerId,
+            buyerId,
+            chatId,
             pointId,
-            createTime,
+            createdAt,
             price: post.price,
             status: ORDER_STATUSES.ACTIVE,
             state: {
