@@ -3,6 +3,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { POST_STATUSES } from '../constants.js';
 import { processImage } from '../utils.js';
+import { v4 as uuidv4 } from 'uuid';
 
 
 const firestore = getFirestore();
@@ -61,7 +62,7 @@ function parseLocation(location) {
  * @returns {Promise<string>} URL сохраненного изображения.
  */
 async function saveImage(userId, postId, base64, mimeType, isSmall = false) {
-    const fileName = `post_${postId}_${Date.now()}.${mimeType.split('/')[1]}`;
+    const fileName = `${uuidv4()}.${mimeType.split('/')[1]}`;
     const filePath = `User_${userId}/Post_${postId}/${fileName}`;
 
     const base64WithoutPrefix = base64.replace(/^data:image\/[^;]+;base64,/, '');
