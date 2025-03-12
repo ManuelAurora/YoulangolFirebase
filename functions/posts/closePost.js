@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 import { POST_STATUSES } from '../constants.js';
+import { getPreviewImage } from '../utils.js';
 
 
 const firestore = getFirestore();
@@ -49,6 +50,7 @@ export const closePost = onCall(async (request) => {
                 categoryId: postData.categoryId,
                 location: postData.location,
                 title: postData.title,
+                preview: postData.preview || getPreviewImage(postData),
                 images: postData.images,
                 price: postData.price,
             },
