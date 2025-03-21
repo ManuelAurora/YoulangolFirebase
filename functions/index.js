@@ -28,6 +28,7 @@ import { getOrderById } from './orders/getOrderById.js';
 import { approveOrder } from './orders/approveOrder.js';
 
 import { getAllOrders } from './admin/getAllOrders.js';
+import { getOrderDetailsById } from './admin/getOrderDetailsById.js';
 import { updateOrder } from './admin/updateOrder.js';
 
 import { getPickupPoints } from './orders/getPickupPoints.js';
@@ -69,6 +70,7 @@ export {
 
     sendEmail,
 
-    updateOrder,
     getAllOrders,
+    getOrderDetailsById,
+    updateOrder,
 };

@@ -29,7 +29,7 @@ export const updateOrder = onCall(async (request) => {
         const orderSnap = await orderRef.get();
 
         if (!orderSnap.exists) {
-            throw new HttpsError('not-found', 'Заказ не найден.');
+            throw new HttpsError('not-found', 'Order not found.');
         }
 
         const updates = {};

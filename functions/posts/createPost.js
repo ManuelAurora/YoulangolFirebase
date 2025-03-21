@@ -28,6 +28,7 @@ function parseLocation(location) {
 
     const { city, displayName, lat, lon } = location;
 
+    // @todo??????
     if (typeof city !== 'string' || !city.trim()) {
         throw new HttpsError('invalid-argument', 'City must be a non-empty string.');
     }

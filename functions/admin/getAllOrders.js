@@ -1,8 +1,11 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import app from '../app.js';
 
 
 const firestore = getFirestore();
+const auth = getAuth(app);
 
 export const getAllOrders = onCall(async (request) => {
     try {
@@ -18,52 +21,69 @@ export const getAllOrders = onCall(async (request) => {
             throw new HttpsError('permission-denied', 'You do not have permission to update this order.');
         }
 
-        const { orderId, id, status } = request.data;
+        const { id, status } = request.data;
 
-        let query = firestore.collection("orders");
+        let query = firestore.collection('orders');
 
-        if (orderId) {
-            const orderDoc = await query.doc(orderId).get();
-
-            if (!orderDoc.exists) {
-                return {
-                    orders: [],
-                };
-            }
-
-            return {
-                orders: [{
-                    id: orderDoc.id,
-                    ...orderDoc.data(),
-                }],
-            };
+        if (status) {
+            query = query.where('status', '==', status);
         }
 
         if (id) {
-            query = query.where("id", "==", id);
-
-            const snapshot = await query.get();
-
-            const orders = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
-
-            return {
-                orders,
-            };
-        }
-
-        if (status) {
-            query = query.where("status", "==", status);
+            query = query
+                .where('id', '>=', id)
+                .where('id', '<=', `${id}\uF8FF`);
         }
 
         const snapshot = await query.get();
 
-        const orders = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-        }));
+        const orders = await Promise.all(
+            snapshot.docs.map(async (doc) => {
+                const orderData = doc.data();
+
+                const [
+                    sellerData,
+                    buyerData,
+                ] = await Promise.all([
+                    auth.getUser(orderData.sellerId).catch(() => null),
+                    auth.getUser(orderData.buyerId).catch(() => null),
+                ]);
+
+                const [
+                    postDoc,
+                    pointDoc,
+                ] = await Promise.all([
+                    firestore.collection('posts').doc(orderData.postId).get(),
+                    firestore.collection('pickup_points').doc(orderData.pointId).get(),
+                ]);
+
+                const postData = postDoc.exists ? postDoc.data() : null;
+                const pointData = pointDoc.exists ? pointDoc.data() : null;
+
+                return {
+                    orderId: doc.id,
+                    ...orderData,
+                    seller: sellerData ?
+                        {
+                            uid: sellerData.uid,
+                            email: sellerData.email,
+                            displayName: sellerData.displayName,
+                            photoURL: sellerData.photoURL,
+                        } :
+                        null,
+                    buyer: buyerData ?
+                        {
+                            uid: buyerData.uid,
+                            email: buyerData.email,
+                            displayName: buyerData.displayName,
+                            photoURL: buyerData.photoURL,
+                        } :
+                        null,
+                    post: postData,
+                    point: pointData,
+                };
+            }),
+        );
 
         return {
             orders,

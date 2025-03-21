@@ -90,7 +90,7 @@ export const createOrder = onCall(async (request) => {
         const createdAt = Date.now();
 
         const orderData = {
-            id: createdAt,
+            id: `${createdAt}`,
             postId,
             sellerId,
             buyerId,
