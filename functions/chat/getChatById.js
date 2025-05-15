@@ -56,7 +56,10 @@ export const getChatById = onCall(async (request) => {
         return {
             post: {
                 id: postId,
+                oldCategoryId: postData.oldCategoryId,
                 categoryId: postData.categoryId,
+                subcategoryId: postData.subcategoryId,
+                brandId: postData.brandId,
                 location: postData.location,
                 preview: postData.preview || getPreviewImage(postData),
                 title: postData.title,

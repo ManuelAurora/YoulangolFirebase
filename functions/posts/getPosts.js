@@ -116,6 +116,10 @@ function mapDocumentToPost(doc) {
 
     return {
         id: doc.id,
+        oldCategoryId: data.oldCategoryId,
+        categoryId: data.categoryId,
+        subcategoryId: data.subcategoryId,
+        brandId: data.brandId,
         createdAt: data.createdAt,
         preview: data.preview || getPreviewImage(data),
         price: data.price,
@@ -124,7 +128,6 @@ function mapDocumentToPost(doc) {
         isSafeDeal: data.isSafeDeal,
         title: data.title,
         userId: data.userId,
-        categoryId: data.categoryId,
         status: data.status,
     };
 }
@@ -142,6 +145,9 @@ function mapDocumentsToPosts(docs) {
 export const getPosts = onCall(async (request) => {
     try {
         const {
+            categoryId,
+            subcategoryId,
+            brandId,
             category,
             location,
             minPrice,
@@ -161,6 +167,18 @@ export const getPosts = onCall(async (request) => {
 
         if (category) {
             query = query.where('categoryId', '==', category);
+        }
+
+        if (categoryId) {
+            query = query.where('categoryId', '==', categoryId);
+        }
+
+        if (subcategoryId) {
+            query = query.where('subcategoryId', '==', subcategoryId);
+        }
+
+        if (brandId) {
+            query = query.where('brandId', '==', brandId);
         }
 
         if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {

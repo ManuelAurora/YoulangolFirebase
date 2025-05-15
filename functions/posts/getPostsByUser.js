@@ -21,7 +21,10 @@ function mapDocumentToPost(doc) {
         isSafeDeal: data.isSafeDeal,
         title: data.title,
         userId: data.userId,
+        oldCategoryId: data.oldCategoryId,
         categoryId: data.categoryId,
+        subcategoryId: data.subcategoryId,
+        brandId: data.brandId,
         status: data.status,
     };
 }

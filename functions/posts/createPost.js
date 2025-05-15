@@ -90,7 +90,17 @@ export const createPost = onCall(async (request) => {
             throw new HttpsError('unauthenticated', 'You must be logged in to create a post.');
         }
 
-        const { title, description, price, categoryId, location, images, isSafeDeal = false } = request.data;
+        const {
+            categoryId,
+            subcategoryId,
+            brandId,
+            title,
+            description,
+            price,
+            location,
+            images,
+            isSafeDeal = false
+        } = request.data;
 
         if (!title || !description || !price || !categoryId || !location || !images) {
             throw new HttpsError('invalid-argument', 'Missing required fields.');
@@ -117,11 +127,14 @@ export const createPost = onCall(async (request) => {
         const preview = await saveImage(userId, postId, firstImage.base64, firstImage.mimeType, true);
 
         const newPost = {
+            oldCategoryId: categoryId,
+            categoryId,
+            subcategoryId: subcategoryId || null,
+            brandId: brandId || null,
             status: POST_STATUSES.OPEN,
             title,
             description,
             price: parsedPrice,
-            categoryId,
             location: locationData,
             preview,
             images: uploadedImages,
