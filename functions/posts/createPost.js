@@ -26,12 +26,7 @@ function parseLocation(location) {
         throw new HttpsError('invalid-argument', 'Location must be an object.');
     }
 
-    const { city, displayName, lat, lon } = location;
-
-    // @todo??????
-    if (typeof city !== 'string' || !city.trim()) {
-        throw new HttpsError('invalid-argument', 'City must be a non-empty string.');
-    }
+    const { city = '', displayName, lat, lon } = location;
 
     if (typeof displayName !== 'string' || !displayName.trim()) {
         throw new HttpsError('invalid-argument', 'Display Name must be a non-empty string.');
