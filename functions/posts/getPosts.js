@@ -58,9 +58,6 @@ function calculateBoundingBox(latitude, longitude, radius) {
  * @param {number|undefined} searchParams.maxLongitude - Максимальное значение долготы для фильтрации по геолокации.
  * @param {number|undefined} searchParams.minPrice - Минимальная цена для фильтрации по цене.
  * @param {number|undefined} searchParams.maxPrice - Максимальная цена для фильтрации по цене.
- * @param {Object} searchParams.datePublished - Параметры фильтрации по дате публикации.
- * @param {number|undefined} searchParams.datePublished.from - Начальная дата публикации для фильтрации.
- * @param {number|undefined} searchParams.datePublished.to - Конечная дата публикации для фильтрации.
  * @param {string} searchParams.search - Подстрока для поиска в заголовках объектов.
  * @returns {Object[]} - Массив объектов, соответствующих заданным параметрам поиска.
  * @throws {Error} - Если переданы некорректные значения параметров поиска.
@@ -87,14 +84,6 @@ function filterPosts(posts, searchParams) {
         }
 
         if (
-            searchParams.datePublished &&
-            ((typeof searchParams.datePublished.from === 'number' && post.createdAt < searchParams.datePublished.from) ||
-                (typeof searchParams.datePublished.to === 'number' && post.createdAt > searchParams.datePublished.to))
-        ) {
-            return false;
-        }
-
-        if (
             typeof searchParams.search === 'string' &&
             searchParams.search &&
             !post.title.toLowerCase().includes(searchParams.search.toLowerCase())
@@ -116,7 +105,6 @@ function mapDocumentToPost(doc) {
 
     return {
         id: doc.id,
-        oldCategoryId: data.oldCategoryId,
         categoryId: data.categoryId,
         subcategoryId: data.subcategoryId,
         brandId: data.brandId,
@@ -148,11 +136,9 @@ export const getPosts = onCall(async (request) => {
             categoryId,
             subcategoryId,
             brandId,
-            category,
             location,
             minPrice,
             maxPrice,
-            datePublished,
             search = '',
             page = 1,
             limit = 10,
@@ -164,10 +150,6 @@ export const getPosts = onCall(async (request) => {
             .collection('posts')
             .where('status', '==', 'open')
             .orderBy('createdAt', 'desc');
-
-        if (category) {
-            query = query.where('categoryId', '==', category);
-        }
 
         if (categoryId) {
             query = query.where('categoryId', '==', categoryId);
@@ -200,7 +182,6 @@ export const getPosts = onCall(async (request) => {
                 maxLongitude,
                 minPrice,
                 maxPrice,
-                datePublished,
                 search,
             });
 
@@ -225,7 +206,7 @@ export const getPosts = onCall(async (request) => {
             const snapshot = await query.get();
             const searchResults = mapDocumentsToPosts(snapshot.docs);
 
-            const filteredPosts = filterPosts(searchResults, { datePublished, search });
+            const filteredPosts = filterPosts(searchResults, { search });
 
             const resultsCount = filteredPosts.length;
 
@@ -234,16 +215,6 @@ export const getPosts = onCall(async (request) => {
                 resultsCount,
                 page,
             };
-        }
-
-        if (datePublished) {
-            if (datePublished.from) {
-                query = query.where('createdAt', '>=', datePublished.from);
-            }
-
-            if (datePublished.to) {
-                query = query.where('createdAt', '<=', datePublished.to);
-            }
         }
 
         const snapshot = await query.get();

@@ -127,7 +127,6 @@ export const createPost = onCall(async (request) => {
         const preview = await saveImage(userId, postId, firstImage.base64, firstImage.mimeType, true);
 
         const newPost = {
-            oldCategoryId: categoryId,
             categoryId,
             subcategoryId: subcategoryId || null,
             brandId: brandId || null,

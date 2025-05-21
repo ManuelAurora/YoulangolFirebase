@@ -47,7 +47,6 @@ export const closePost = onCall(async (request) => {
             message: 'Post closed successfully.',
             post: {
                 id: postId,
-                oldCategoryId: postData.oldCategoryId,
                 categoryId: postData.categoryId,
                 subcategoryId: postData.subcategoryId,
                 brandId: postData.brandId,
