@@ -8,6 +8,7 @@ import { getPostById } from './posts/getPostById.js';
 import { getPosts } from './posts/getPosts.js';
 import { getPostsByUser } from './posts/getPostsByUser.js';
 import { getPostUserData } from './posts/getPostUserData.js';
+import { getRecommendedPosts } from './posts/getRecommendedPosts.js';
 
 import { createChat } from './chat/createChat.js';
 import { getChatById } from './chat/getChatById.js';
@@ -47,6 +48,7 @@ export {
     getPosts,
     getPostsByUser,
     getPostUserData,
+    getRecommendedPosts,
 
     getChatById,
     getChats,
